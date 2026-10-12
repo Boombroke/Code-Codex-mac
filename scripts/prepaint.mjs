@@ -3,6 +3,7 @@
 export function createPrepaint(host, shellStyle, composerStyle) {
   const document=host.document,key='code-codex-mac-backgrounds:v1';
   host.__CCMacPrepaint__?.dispose();
+  const homeMaterial=host.__CC_MAC_HOME_MATERIAL__?.(host);
   const style=document.createElement('style');style.id='cc-mac-prepaint-style';
   const gate='data-cc-mac-prepaint';
   const scope='html['+gate+'] #root';
@@ -52,10 +53,11 @@ export function createPrepaint(host, shellStyle, composerStyle) {
     lease('--cc-mac-prepaint-backdrop',`linear-gradient(135deg,${selected.join(',')})`);
     lease('--cc-mac-prepaint-composer',`rgba(18,23,32,${alpha})`);
     lease('--cc-mac-prepaint-composer-filter',config?.performance==='economy'?'none':config?.performance==='quality'?'blur(4px) saturate(1.08)':'blur(3px)');
+    homeMaterial?.update({...config,enabled:active});
   }
   let saved;try{saved=JSON.parse(host.localStorage.getItem(key)||'{}');}catch{}
   update(saved);
   if(!root){observer=new host.MutationObserver(()=>{install();if(root)update(latestConfig);});observer.observe(document,{childList:true,subtree:true});}
-  const api={update,dispose(){if(disposed)return;disposed=true;observer?.disconnect();style.remove();if(root){if(previousGate===null)root.removeAttribute(gate);else root.setAttribute(gate,previousGate);for(const [name,prior]of leases)if(prior.value)root.style.setProperty(name,prior.value,prior.priority);else root.style.removeProperty(name);}if(host.__CCMacPrepaint__===api)delete host.__CCMacPrepaint__;}};
+  const api={update,dispose(){if(disposed)return;disposed=true;observer?.disconnect();homeMaterial?.dispose();style.remove();if(root){if(previousGate===null)root.removeAttribute(gate);else root.setAttribute(gate,previousGate);for(const [name,prior]of leases)if(prior.value)root.style.setProperty(name,prior.value,prior.priority);else root.style.removeProperty(name);}if(host.__CCMacPrepaint__===api)delete host.__CCMacPrepaint__;}};
   host.__CCMacPrepaint__=api;return api;
 }

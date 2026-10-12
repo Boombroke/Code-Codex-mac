@@ -14,17 +14,18 @@ export function createComposerStyle(scopes = ['[data-cc-mac-background-surface][
   const safe = selector => `${selector}:not(${protectedControl}):not(${protectedControl} *):not(${popup} *)`;
   const rail = `.bg-background-composer-action-bar:not(${protectedControl})`;
   const structural = `:is([data-composer-layout],[data-composer-surface-variant],[data-composer-body],[data-composer-input],[data-composer-input-layout],[class*="ComposerLayoutBody"],[class*="ComposerLayoutInput"],[class*="ComposerLayoutFooter"],[class*="ComposerLayoutReplyContext"],.ProseMirror,textarea,.bg-background-composer-surface,.bg-background-composer-action-bar)`;
-  const clear = [safe(shell), safe(`${shell} ${structural}`), safe(rail)];
-  const body = ':is([data-composer-body],[class*="ComposerLayoutBody"])';
+  const home = `${shell}[data-composer-utility-bar-variant="home"]`;
+  const homeChrome = ':is([data-composer-rail],[data-composer-rail-item],.composer-surface-chrome,.absolute.inset-x-0:has([data-composer-rail]),.relative:has(>[data-composer-body]))';
+  const clear = [safe(shell), safe(`${shell} ${structural}`), safe(rail),safe(`${home} ${homeChrome}`)];
   const owners = [
-    safe(`${shell}:not([data-composer-utility-bar-variant="home"])`),
-    safe(`${shell}[data-composer-utility-bar-variant="home"] > ${body}`),
-    // A standalone action rail can paint once. Rails inside a composer or
-    // another rail are clear, including Home rails outside its painted body.
+    safe(`${shell}:not([data-cc-mac-home-material-owner])`),
+    // Unrelated standalone rails can paint once. Home rails always use the
+    // unified plate, even where absolute positioning crosses the root bounds.
     safe(`${rail}:not(${roots} ${rail}):not(.bg-background-composer-action-bar ${rail})`),
   ];
   const surface = 'var(--cc-mac-composer-surface,var(--cc-mac-prepaint-composer,rgba(18,23,32,.25)))';
   const frost = 'var(--cc-material-composer-filter,var(--cc-mac-prepaint-composer-filter,none))';
+  const homeOwner = `${safe(home)}[data-cc-mac-home-material-owner]`;
   return `
 ${within(clear)} {
   --composer-layout-surface-background:transparent!important;
@@ -41,5 +42,14 @@ ${within(owners)} {
   background-color:${surface}!important;background-image:none!important;
   backdrop-filter:${frost}!important;-webkit-backdrop-filter:${frost}!important;
 }
+${within([homeOwner])} {isolation:isolate!important;border-color:transparent!important}
+${within([`${homeOwner}::before`])} {
+  content:"";position:absolute;pointer-events:none;z-index:-1;
+  top:var(--cc-home-material-top,0px);right:var(--cc-home-material-right,0px);bottom:var(--cc-home-material-bottom,0px);left:var(--cc-home-material-left,0px);
+  border-radius:inherit;border:1px solid var(--cc-material-border,rgba(235,247,255,.22));
+  background:${surface}!important;backdrop-filter:${frost}!important;-webkit-backdrop-filter:${frost}!important;box-shadow:none!important;
+}
+${within([`${home} ${homeChrome}::before`,`${home} ${homeChrome}::after`])} {background:transparent!important;box-shadow:none!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important;border-color:transparent!important}
+${within([safe(`${home} ${homeChrome}`),safe(`${home} ${internals}`)])} {border-color:transparent!important}
 `;
 }

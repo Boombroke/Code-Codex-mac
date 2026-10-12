@@ -13,7 +13,7 @@ test('document-start and mounted phases share one serialized composer policy',()
   assert.equal(createComposerStyle(head).replaceAll(head,mounted),createComposerStyle(mounted));
   for(const css of [createComposerStyle(head),createComposerStyle(mounted)]){
     assert(!css.includes('data-cc-mac-region'),'painting must not change when region markers arrive');
-    assert.equal(rules(css).length,2,'only structural clearing and owner painting are needed');
+    assert.equal(rules(css).length,6,'Home uses a single geometric plate with chrome cleanup');
   }
 });
 
@@ -24,8 +24,8 @@ test('native inner layout tokens cannot become additional material owners',()=>{
     assert(painting.selectors.includes(marker),'exclude internal layout tokens from roots '+marker);
   }
   assert(painting.selectors.includes(':not(:is([data-composer-surface-variant],[data-composer-layout]) :is([data-composer-surface-variant],[data-composer-layout]))'));
-  assert(painting.selectors.includes(':not([data-composer-utility-bar-variant="home"])'));
-  assert(painting.selectors.includes('[data-composer-utility-bar-variant="home"] > :is([data-composer-body],[class*="ComposerLayoutBody"])'));
+  assert(painting.selectors.includes(':not([data-cc-mac-home-material-owner])'));
+  assert(!painting.selectors.includes(' > :is([data-composer-body]'),'wrapped Home Body cannot own another material');
   assert(clearing.declarations.includes('--composer-layout-surface-background:transparent!important'));
   assert(clearing.declarations.includes('--color-background-composer-action-bar:transparent!important'));
   assert(clearing.selectors.includes('.ProseMirror,textarea'),'editable contents cannot paint a second backing');
@@ -51,7 +51,8 @@ test('structural cleanup preserves semantic controls, popups and general surface
   assert(!/--color-surface(?:[-:]|\s)/.test(clear.declarations),'generic surface aliases must remain available to buttons');
   assert(!css.includes('aria-selected'),'selected controls must not be made transparent');
   assert(!css.includes('data-state'),'active controls must not be made transparent');
-  assert(!css.includes('::before')&&!css.includes('::after'),'native caret/selection pseudo-elements remain untouched');
+  assert(css.includes('data-cc-mac-home-material-owner'),'Home plate has a dedicated owner');
+  assert(!css.includes('ProseMirror::'),'caret and editor pseudo-elements are not cleanup targets');
 });
 
 test('each supplied shell scope applies to both rules; missing scopes are rejected',()=>{

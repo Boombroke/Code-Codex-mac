@@ -1,10 +1,10 @@
 # 验证与发布
 
-版本：1.0.0-rc.10。适配目标：Apple Silicon、macOS 13+、ChatGPT Desktop 的 Codex 模式。当前本机官方应用版本为 26.1007.30912；其他版本与 Chat/Work 模式未验证。
+版本：1.0.0-rc.11。适配目标：Apple Silicon、macOS 13+、ChatGPT Desktop 的 Codex 模式。当前本机官方应用版本为 26.1007.30912；其他版本与 Chat/Work 模式未验证。
 
 ## 本地已经检查
 
-- 87 项 Node 测试：源资产完整性、独立帧调度、性能像素预算、材质和主题语义、上游设置边界。
+- 94 项 Node 测试：源资产完整性、独立帧调度、性能像素预算、材质和主题语义、上游设置边界。
 - Swift 原生编译通过；严格 code-sign 验证通过，签名类型为 ad-hoc。
 - 安装到隔离临时目录、重复覆盖更新、拒绝覆盖其他应用目录。
 - 原生启动模式和重复点击决策测试；Dock 添加、去重、移除和保留原图标及顺序模型测试。
@@ -12,6 +12,14 @@
 - 原生应用不包含 Node/Electron 运行时或官方应用副本。
 - 已在本机安装个人八效果包并核验签名和资源哈希；原生安装与可选说明插件注册分离。卸载可清理已注册的说明插件。
 - 外部工具调用设定超时，原生安装在后台执行，避免第三方 CLI 阻塞界面。
+
+## rc.11 首页文件栏整体材质
+
+静态核对原生Home组装：Hosted Body包在relative层，文件/项目栏位于Home Root内的绝对UtilityBarSlot，可在Root之外的上方/下方并用负margin伸入Body。rc.10的直接Body child假设不成立，且data-composer-rail、rail-item和composer-surface-chrome未完整清理。
+
+本次Home Root只承载一块伪元素底板，四个inset按Root和可见rail的联合矩形设置。内部Body、slot、rail/item及其伪元素不再绘制另一层底色、磨砂或阴影。观察仅由相关DOM、ResizeObserver、窗口尺寸及动画结束事件触发；关闭/恢复时还原原标记和CSS变量，保留按钮/弹窗子树。
+
+独立home-material页面模拟真实绝对above/below Slot、包裹Body、附着负margin与原生prominent shadow。按输入区、文件栏区、交叠区的屏幕点检查，三处均只有shared plate的0.25 alpha，rail阴影为none，底板覆盖全部rail。增加文件行及上下换位也通过；暗色同一回归通过；恢复后Home owner标记和几何变量均清空。这是独立几何/CSS验证，不是正在运行的GPT逐像素验收。
 
 ## rc.10 残余闪底与输入区叠色
 

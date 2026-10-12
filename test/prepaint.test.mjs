@@ -39,6 +39,7 @@ function harness({saved=valid,raw,hasRoot=true,hasHead=true}={}) {
   const document={
     documentElement:null,head:null,readyState:'loading',children:[],
     createElement(tag){return new Element(tag);},
+    querySelectorAll(){return [];}, // No application/Home nodes exist in this document-start harness.
     addEventListener(type,callback,options){if(!listeners.has(type))listeners.set(type,[]);listeners.get(type).push({callback,once:options?.once});},
   };
   const localStorage={value:raw??JSON.stringify(saved),getItem(){return this.value;},setItem(key,value){this.value=String(value);}};
