@@ -1,6 +1,6 @@
 # 验证与发布
 
-版本：1.0.0-rc.4。适配目标：Apple Silicon、macOS 13+、ChatGPT Desktop 的 Codex 模式。当前本机官方应用版本为 26.1007.30912；其他版本与 Chat/Work 模式未验证。
+版本：1.0.0-rc.5。适配目标：Apple Silicon、macOS 13+、ChatGPT Desktop 的 Codex 模式。当前本机官方应用版本为 26.1007.30912；其他版本与 Chat/Work 模式未验证。
 
 ## 本地已经检查
 
@@ -12,6 +12,12 @@
 - 原生应用不包含 Node/Electron 运行时或官方应用副本。
 - 已在本机安装个人八效果包并核验签名和资源哈希；原生安装与可选说明插件注册分离。卸载可清理已注册的说明插件。
 - 外部工具调用设定超时，原生安装在后台执行，避免第三方 CLI 阻塞界面。
+
+## rc.5 侧栏和用户消息修复验证
+
+用户确认已从新版 Dock 入口重启，截图仍显示任务名及用户消息暗字。本次静态核对当前宿主的 sidebar-navigation/nav 局部 color-text 定义、sidebar-item 行和 data-user-message-bubble 专用前景。preview/conversation.html 使用这些结构，旧 rc.4 对照能复现暗字；修复后核验亮暗背景、项目和任务标题、用户消息、新增节点、仅补语义属性、inverse 行及恢复。绿色状态和现有代码配色策略保留，侧栏与气泡仍透明。
+
+本次没有控制或重载当前 GPT 自身；已安装的修复包仍需完整重启后验收实际窗口。
 
 ## rc.4 设置页透明修复验证
 

@@ -20,7 +20,7 @@ export function createTheme({transparency=100,backgroundOpacity=100,hue=0,tone='
   // Native token aliases are computed at :root; redefining only their inputs
   // on a descendant does not update inherited, already-resolved aliases.
   for(const key of [
-    "color-text","color-text-default","color-text-primary","color-text-foreground","color-text-emphasis","color-text-prose","color-text-composer-primary",
+    "color-text","color-text-default","color-text-primary","color-text-foreground","color-text-emphasis","color-text-prose","color-text-composer-primary","color-text-user-message",
     "color-codex-icon","color-codex-icon-active","app-color-icon-primary","app-color-icon-secondary","color-token-icon-foreground","app-color-text-foreground","color-token-foreground","color-token-text-primary","color-token-text-secondary","color-token-editor-foreground","color-token-input-foreground","color-token-dropdown-foreground","color-token-menu-foreground","color-token-side-bar-title-foreground","color-codex-editor-cursor","color-codex-editor-inline-code-foreground","text-primary",
   ])vars["--"+key]="var(--cc-theme-fg)";
   for(const key of ["color-text-secondary","color-text-tertiary","app-color-text-foreground-secondary","app-color-text-foreground-tertiary","color-codex-description","color-token-description-foreground","color-token-text-tertiary","color-token-input-placeholder-foreground","text-secondary","text-tertiary"])vars["--"+key]="var(--cc-theme-muted)";

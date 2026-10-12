@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Code-Codex Mac · 侧栏和用户消息回归模拟</title>
+  <style>
+    * {box-sizing:border-box}
+    html,body {margin:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif}
+    body {height:100vh;display:flex;flex-direction:column;padding:16px;color:#14202b;background:repeating-linear-gradient(135deg,#e2edf8 0 12px,#aac0d7 12px 24px)}
+    button {font:inherit;cursor:pointer;padding:7px 12px;border:1px solid #8994a0;border-radius:7px;background:#f4f6fa;color:#14202b}
+    .testbar {display:flex;flex-wrap:wrap;flex-shrink:0;gap:8px;align-items:center;margin-bottom:10px}
+    .testbar small {margin-left:auto}
+    #fixture-status {flex-shrink:0;margin:0 0 10px;color:#14202b;font-size:12px}
+    :root {
+      --theme-variant:light;
+      --color-surface:#ffffff;
+      --color-text:#14202b;
+      --color-text-secondary:#465462;
+      --color-text-tertiary:#526071;
+      --color-text-user-message:#28334a;
+      --color-background-primary-solid:#101827;
+      --color-background-user-message:transparent;
+      --color-border-default:rgba(90,110,130,.28);
+      --color-codex-editor-cursor:#14202b;
+      --color-status-success:#34d399;
+      --color-codex-syntax-keyword:#bf3479;
+      --color-codex-syntax-string:#207947;
+      --color-text-accent:#2269c0;
+      caret-color:var(--color-codex-editor-cursor);
+    }
+    :root[data-theme="dark"] {
+      --theme-variant:dark;
+      --color-surface:#161b23;
+      --color-text:#edf3fb;
+      --color-text-secondary:#bac5d1;
+      --color-text-tertiary:#bac5d1;
+      --color-background-primary-solid:#f2f6ff;
+      --color-codex-editor-cursor:#edf3fb;
+      --color-codex-syntax-keyword:#f6a6d0;
+      --color-codex-syntax-string:#acf0c1;
+      --color-text-accent:#a6d1ff;
+      /* The native user-message token stays dark to exercise its own alias. */
+      --color-text-user-message:#28334a;
+    }
+    #root {position:relative;flex:1;min-height:0;overflow:hidden;border-radius:12px;background:var(--color-surface)}
+    .frame {height:100%;display:flex;flex-direction:column}
+    header {height:44px;display:flex;gap:16px;align-items:center;padding:0 18px;border-bottom:1px solid var(--color-border-default)}
+    .workspace {display:flex;flex:1;min-height:0}
+    aside {width:268px;flex-shrink:0;overflow:auto;border-right:1px solid var(--color-border-default);background:transparent}
+    .sidebar-navigation {padding:20px 12px;background:transparent;min-height:100%}
+    ._Navigation_1uxfp_2 {
+      --color-text:color-mix(in oklab,var(--color-background-primary-solid) 85%,transparent);
+      color:var(--color-text);
+      background:transparent;
+    }
+    nav h2 {font-weight:500;font-size:12px;margin:22px 8px 10px}
+    nav h2:first-child {margin-top:0}
+    .sidebar-item {display:flex;align-items:center;gap:9px;min-height:38px;padding:8px;border-radius:7px;cursor:pointer;background:transparent}
+    .sidebar-item:hover {background:color-mix(in srgb,var(--color-text) 9%,transparent)}
+    .sidebar-item[data-theme="dark"] {--color-background-primary-solid:#f2f6ff;--color-text:color-mix(in oklab,var(--color-background-primary-solid) 85%,transparent)}
+    .sidebar-item[aria-current="page"] {border:1px solid #7d6acb}
+    [data-thread-title-trigger] {min-width:0;flex:1}
+    .text-fade-truncate,.truncate {display:block;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+    .text-default {color:var(--color-text)}
+    .text-secondary {color:var(--color-text-secondary)}
+    .text-tertiary {color:var(--color-text-tertiary)}
+    .text-success {color:var(--color-status-success)}
+    .status-dot {font-size:18px;line-height:1;flex-shrink:0}
+    .folder-icon {width:15px;flex-shrink:0}
+    main {flex:1;min-width:0;overflow:auto;padding:28px 36px;background:var(--color-surface);color:var(--color-text)}
+    .conversation {max-width:780px;margin:0 auto}
+    h1 {font-size:25px;font-weight:550;margin:0 0 24px}
+    .bg-user-message {background:var(--color-background-user-message)}
+    .text-user-message,[data-markdown-text-tone="user-message"] {color:var(--color-text-user-message)}
+    ._bubble_11evq_1 {width:80%;max-width:580px;margin:18px 0 20px auto;padding:17px 20px;border-radius:15px;border:1px solid var(--color-border-default);line-height:1.8}
+    ._bubble_11evq_1 p {margin:0}
+    .assistant-content {margin:20px 0;line-height:1.8;color:var(--color-text)}
+    .assistant-content p {margin:10px 0}
+    .assistant-content a {color:var(--color-text-accent);text-decoration:underline}
+    .code-sample {padding:17px 18px;border-radius:14px;background:#292c32}
+    .code-sample pre {margin:0;font:12px/1.7 ui-monospace,SFMono-Regular,monospace}
+    .token-keyword {color:var(--color-codex-syntax-keyword)}
+    .token-string {color:var(--color-codex-syntax-string)}
+    .ordinary-node {padding:15px 18px;margin:20px 0;border:1px dashed var(--color-border-default);border-radius:12px;line-height:1.8}
+    .composer {padding:14px;border-radius:14px;border:1px solid var(--color-border-default);margin-top:22px;background:var(--color-surface)}
+    .ProseMirror {min-height:60px;outline:none;white-space:pre-wrap;color:var(--color-text);caret-color:var(--color-codex-editor-cursor)}
+    .composer-footer {display:flex;align-items:center;justify-content:space-between;padding-top:10px}
+    .send-button {background:#314c7b;color:#ffffff;border-color:#314c7b}
+    @media(max-width:1000px) {.testbar small {width:100%;margin-left:0}aside {width:240px}main {padding:24px}.composer-footer {gap:10px}}
+  </style>
+</head>
+<body>
+  <div class="testbar">
+    <button id="light">亮色主题</button><button id="dark">暗色主题</button>
+    <button id="night">深色背景</button><button id="day">亮色背景</button>
+    <button id="mountain">山峦背景</button><button id="black-hole">黑洞背景</button>
+    <button id="add-task">新任务</button><button id="add-bubble">新气泡</button>
+    <button id="mark-bubble">给普通节点补气泡属性</button><button id="inverse-item">切换 inverse 行</button>
+    <button id="nav-role">切换导航语义</button><button id="restore">恢复</button>
+    <small>独立回归模拟 · 非 GPT 窗口</small>
+  </div>
+  <p id="fixture-status" role="status">外部条纹应保持原样；模拟本地导航变量和用户消息专用文字变量。</p>
+  <div id="root">
+    <div class="frame" data-app-shell-frame="true">
+      <header data-app-shell-titlebar><span data-app-shell-titlebar-content>Code-Codex Mac</span><span class="text-secondary">侧栏 / 用户气泡 / 动态节点回归模拟</span></header>
+      <div class="workspace">
+        <aside class="app-shell-left-panel" data-app-shell-left-panel-appearance="default">
+          <div class="sidebar-navigation">
+            <nav id="sidebar-nav" role="navigation" class="_Navigation_1uxfp_2">
+              <h2 class="text-secondary">最近任务</h2>
+              <div id="task-primary" class="sidebar-item" role="button" tabindex="0" aria-current="page"><span id="success-dot" class="status-dot text-success" aria-label="任务已通过">●</span><div data-thread-title-trigger class="text-default"><span id="task-title" data-thread-title class="text-fade-truncate">修复侧栏任务标题的配色</span></div></div>
+              <div id="task-inverse" class="sidebar-item" role="button" tabindex="0"><div data-thread-title-trigger class="text-default"><span id="inverse-title" data-thread-title class="text-fade-truncate">验证普通行和 inverse 行</span></div></div>
+              <div id="task-secondary" class="sidebar-item" role="button" tabindex="0"><div data-thread-title-trigger class="text-default"><span data-thread-title class="text-fade-truncate">整理动态背景运行选项</span></div></div>
+              <div id="new-task-list"></div>
+              <h2 class="text-secondary">项目</h2>
+              <div id="project-primary" class="sidebar-item sidebar-row-focus group/folder-row text-default" role="button" tabindex="0"><svg class="folder-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 3h5l2 2h5v8H2z" fill="none" stroke="currentColor"/></svg><span id="project-label" class="truncate">背景适配实验室</span></div>
+              <div id="project-secondary" class="sidebar-item sidebar-row-focus group/folder-row text-default" role="button" tabindex="0"><svg class="folder-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 3h5l2 2h5v8H2z" fill="none" stroke="currentColor"/></svg><span class="truncate">本地演示项目</span></div>
+              <h2 class="text-tertiary">中性文字与状态色分别验证</h2>
+            </nav>
+          </div>
+        </aside>
+        <main data-app-shell-main-surface="default">
+          <div class="conversation">
+            <h1 class="text-default">让文字跟随局部背景</h1>
+            <div id="user-bubble" data-user-message-bubble class="bg-user-message text-user-message _bubble_11evq_1"><div id="user-text" data-markdown-text-tone="user-message"><p>请检查任务名、项目名和用户消息，无论主题怎么切换，都应该清楚可见。</p></div></div>
+            <div class="assistant-content"><p class="text-default">导航内层定义了自己的文字变量，用户消息也使用独立前景变量；只改根节点无法覆盖这些作用域。</p><p class="text-secondary">下面的 <a id="message-link" href="#reference">消息链接</a> 保持链接语义，绿色状态点和代码高亮保留各自配色。</p></div>
+            <div id="code-sample" class="code-sample" data-markdown-copy="code-block"><pre><code><span id="syntax-keyword" class="token-keyword">const</span> theme = <span id="syntax-string" class="token-string">'auto'</span>;
+// 明确的中性文字才跟随前景变量</code></pre></div>
+            <div id="pending-bubble" class="ordinary-node text-user-message">这是普通节点；点击上方按钮只新增气泡语义属性，验证观察器能否及时重新标记。</div>
+            <div id="new-bubble-list"></div>
+            <div id="reference" class="assistant-content text-secondary">此页面只模拟样式结构和交互，不连接 GPT 账号或聊天记录。</div>
+            <div class="composer" data-composer-layout="default" data-composer-surface-variant="default"><div class="ProseMirror text-default" contenteditable="true" role="textbox" aria-label="消息输入框" data-composer-input spellcheck="false"></div><div class="composer-footer"><span class="text-secondary">输入框 75% 透明度 · 字体 100% 不透明</span><button id="send" class="send-button">发送示例</button></div></div>
+          </div>
+        </main>
+      </div>
+    </div>
+  </div>
+  <script>
+    const key='code-codex-mac-backgrounds:v1';
+    const params=new URLSearchParams(location.search);
+    const effect=params.get('effect')||'blinking-squares';
+    document.documentElement.dataset.theme=params.get('theme')||'light';
+    localStorage.setItem(key,JSON.stringify({enabled:true,layoutVersion:4,materialVersion:1,clarityVersion:2,effect,transparency:100,backgroundOpacity:100,composerTransparency:75,tone:'auto',performance:'economy',settings:{'blinking-squares':{backgroundColor:params.get('bright')?'#f4ede4':'#121a29',squareColor:'#ffffff',opacity:.12,keyboardInteraction:false,mouseInteraction:false}}}));
+    const byId=id=>document.getElementById(id);
+    const status=message=>byId('fixture-status').textContent=message;
+    byId('light').onclick=()=>document.documentElement.dataset.theme='light';
+    byId('dark').onclick=()=>document.documentElement.dataset.theme='dark';
+    byId('night').onclick=()=>location.href='?theme='+document.documentElement.dataset.theme;
+    byId('day').onclick=()=>location.href='?bright=1&theme='+document.documentElement.dataset.theme;
+    byId('mountain').onclick=()=>location.href='?effect=mountain&theme='+document.documentElement.dataset.theme;
+    byId('black-hole').onclick=()=>location.href='?effect=black-hole&theme='+document.documentElement.dataset.theme;
+    let taskCount=0,bubbleCount=0;
+    byId('add-task').onclick=()=>{
+      const row=document.createElement('div');row.id='added-task-'+(++taskCount);row.className='sidebar-item';row.setAttribute('role','button');row.tabIndex=0;
+      const trigger=document.createElement('div');trigger.setAttribute('data-thread-title-trigger','');trigger.className='text-default';
+      const title=document.createElement('span');title.id='added-task-title-'+taskCount;title.setAttribute('data-thread-title','');title.className='text-fade-truncate';title.textContent='动态新增任务 '+taskCount;
+      trigger.append(title);row.append(trigger);byId('new-task-list').append(row);status('已新增任务 '+taskCount+'，导航本地变量仍然存在。');
+    };
+    function appendBubble(text) {
+      const bubble=document.createElement('div');bubble.id='added-bubble-'+(++bubbleCount);bubble.setAttribute('data-user-message-bubble','');bubble.className='bg-user-message text-user-message _bubble_11evq_1';
+      const content=document.createElement('div');content.id='added-bubble-text-'+bubbleCount;content.setAttribute('data-markdown-text-tone','user-message');content.textContent=text;
+      bubble.append(content);byId('new-bubble-list').append(bubble);status('已新增气泡 '+bubbleCount+'，需要适配专用 --color-text-user-message。');
+    }
+    byId('add-bubble').onclick=()=>appendBubble('动态插入的用户消息 '+(bubbleCount+1)+'，不含旧版 message 类或 data-message-role。');
+    byId('mark-bubble').onclick=()=>{byId('pending-bubble').setAttribute('data-user-message-bubble','');status('只为 pending-bubble 新增 data-user-message-bubble 属性，没有修改 class、style 或子节点。');};
+    byId('inverse-item').onclick=()=>{const row=byId('task-inverse');if(row.dataset.theme==='dark')row.removeAttribute('data-theme');else row.dataset.theme='dark';status('task-inverse 的 data-theme='+ (row.dataset.theme||'（未设置）')+'；标题和绿色状态点应分别保留正确配色。');};
+    document.getElementById('nav-role').onclick=()=>{const n=document.getElementById('sidebar-nav');if(n.hasAttribute('role'))n.removeAttribute('role');else n.setAttribute('role','navigation');};
+    byId('restore').onclick=()=>{window.__CCMacBackground__?.dispose();status('已恢复原生模拟样式；导航回到本地变量配色，用户文字回到固定暗色 #28334a，外部条纹保留。');};
+    byId('send').onclick=()=>{const editor=document.querySelector('.ProseMirror');appendBubble(editor.textContent||'输入框发送的示例消息');editor.textContent='';};
+  </script>
+  <script src="/payload.js"></script>
+</body>
+</html>
