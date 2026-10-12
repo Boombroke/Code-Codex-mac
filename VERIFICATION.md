@@ -32,4 +32,4 @@ rc.2 修正了窗口初始化时序，安装与设置页已能通过原生界面
 - 复核 LICENSE_STATUS 与所有再分发材料。
 - 用 Developer ID 签名并完成 Apple notarization、staple 和 Gatekeeper 检查。
 - 将版本号升级为稳定版，构建公开包，核对 SHA256SUMS；禁止上传 private/ 构建。
-- 推送后的 GitHub Actions 必须实际通过；当前没有远端仓库，CI 尚未触发。
+- 推送后的 GitHub Actions 必须实际通过；以本仓库 [checks 工作流](https://github.com/Boombroke/Code-Codex-mac/actions/workflows/ci.yml)中目标提交 SHA 对应的测试与 macOS 构建结果为准。
