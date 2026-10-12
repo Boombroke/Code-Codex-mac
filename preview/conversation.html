@@ -122,11 +122,11 @@
         </aside>
         <main data-app-shell-main-surface="default">
           <div class="conversation">
-            <h1 class="text-default">让文字跟随局部背景</h1>
+            <h1 class="text-default">让文字在动态背景上保持稳定</h1>
             <div id="user-bubble" data-user-message-bubble class="bg-user-message text-user-message _bubble_11evq_1"><div id="user-text" data-markdown-text-tone="user-message"><p>请检查任务名、项目名和用户消息，无论主题怎么切换，都应该清楚可见。</p></div></div>
             <div class="assistant-content"><p class="text-default">导航内层定义了自己的文字变量，用户消息也使用独立前景变量；只改根节点无法覆盖这些作用域。</p><p class="text-secondary">下面的 <a id="message-link" href="#reference">消息链接</a> 保持链接语义，绿色状态点和代码高亮保留各自配色。</p></div>
             <div id="code-sample" class="code-sample" data-markdown-copy="code-block"><pre><code><span id="syntax-keyword" class="token-keyword">const</span> theme = <span id="syntax-string" class="token-string">'auto'</span>;
-// 明确的中性文字才跟随前景变量</code></pre></div>
+// 中性文字固定白色，语法保留颜色</code></pre></div>
             <div id="pending-bubble" class="ordinary-node text-user-message">这是普通节点；点击上方按钮只新增气泡语义属性，验证观察器能否及时重新标记。</div>
             <div id="new-bubble-list"></div>
             <div id="reference" class="assistant-content text-secondary">此页面只模拟样式结构和交互，不连接 GPT 账号或聊天记录。</div>

@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Code-Codex Mac · 合成性能对比</title>
+  <style>
+    *{box-sizing:border-box}html,body{margin:0;font:13px -apple-system,BlinkMacSystemFont,sans-serif}
+    body{height:100vh;display:flex;flex-direction:column;padding:12px;background:#dce6ee;color:#172533}
+    button,input,select{font:inherit}button,select{cursor:pointer}button{padding:5px 9px;border:1px solid #8d9aaa;border-radius:6px;background:#f3f6fa;color:#172533}
+    #benchmark-options{display:flex;flex-wrap:wrap;gap:6px 12px;align-items:center;flex-shrink:0;margin-bottom:7px}#benchmark-options label{display:flex;gap:5px;align-items:center}#benchmark-options input[type=number]{width:52px}
+    #benchmark-status{margin:0 0 7px;min-height:18px;flex-shrink:0}#benchmark-details{flex-shrink:0;margin-bottom:7px}#performance-report{max-height:200px;overflow:auto;margin:7px 0;font:11px/1.4 ui-monospace,monospace;white-space:pre-wrap}
+    :root{--theme-variant:light;--color-surface:#fff;--color-background-panel:#f3f5f8;--color-background-primary-soft-alpha:#f3f5f8;--color-background-primary-solid:#101827;--color-text:#14202b;--color-text-secondary:#465462;--color-text-tertiary:#526071;--color-text-user-message:#28334a;--color-background-user-message:transparent;--color-border-default:rgba(90,110,130,.28);--color-text-info:#2269c0;--color-text-success:#34d399;--color-text-danger:#fa7171;--color-chart-blue:#8b40ff;--color-control-thumb-on-accent:#fff;--color-codex-editor-cursor:#14202b;--color-codex-syntax-keyword:#b43479;--color-codex-syntax-string:#207947}
+    :root[data-theme=dark]{--theme-variant:dark;--color-surface:#161b23;--color-text:#edf3fb;--color-text-secondary:#bac5d1;--color-text-tertiary:#bac5d1;--color-background-primary-solid:#f2f6ff;--color-codex-editor-cursor:#edf3fb;--color-text-info:#a6d1ff;--color-codex-syntax-keyword:#f6a6d0;--color-codex-syntax-string:#acf0c1}
+    #root{position:relative;flex:1;min-height:0;overflow:hidden;border-radius:10px;background:var(--color-surface)}.frame{height:100%;display:flex;flex-direction:column}header{height:37px;flex-shrink:0;display:flex;gap:20px;align-items:center;padding:0 16px;border-bottom:1px solid var(--color-border-default)}.workspace{display:flex;flex:1;min-height:0}
+    aside{width:255px;flex-shrink:0;overflow:auto;border-right:1px solid var(--color-border-default)}.sidebar-navigation{padding:12px;min-height:100%}._Navigation_1uxfp_2{--color-text:color-mix(in oklab,var(--color-background-primary-solid) 85%,transparent);color:var(--color-text)}nav h2{font-size:12px;font-weight:500;margin:13px 7px 8px}
+    .sidebar-item{display:flex;gap:8px;align-items:center;min-height:34px;padding:7px;border-radius:7px;cursor:pointer}.sidebar-item:hover{background:color-mix(in srgb,var(--color-text) 9%,transparent)}.sidebar-item[data-theme=dark]{--color-text:color-mix(in oklab,#f2f6ff 85%,transparent)}[data-thread-title-trigger]{min-width:0;flex:1}.truncate,.text-fade-truncate{display:block;min-width:0;white-space:nowrap;text-overflow:ellipsis;overflow:hidden}
+    .text-default{color:var(--color-text)}.text-secondary{color:var(--color-text-secondary)}.text-tertiary{color:var(--color-text-tertiary)}.text-info{color:var(--color-text-info)}.text-success{color:var(--color-text-success)}.text-danger{color:var(--color-text-danger)}.folder-icon{width:14px;flex-shrink:0}.status-dot{font-size:17px;line-height:1}
+    main{flex:1;min-width:0;display:flex;flex-direction:column;padding:0 24px 15px;background:var(--color-surface);color:var(--color-text)}.thread-scroll-container{flex:1;min-height:0;overflow:auto;padding:20px 8px}.conversation{max-width:760px;margin:0 auto}h1{font-size:24px;margin:0 0 18px}.assistant-content{line-height:1.8;margin:12px 0}.assistant-content a{color:var(--color-text-info)}.bg-user-message{background:var(--color-background-user-message)}.text-user-message,[data-markdown-text-tone=user-message]{color:var(--color-text-user-message)}._bubble_11evq_1{max-width:80%;margin:14px 0 14px auto;padding:11px 16px;border-radius:14px;line-height:1.7;border:1px solid var(--color-border-default)}._bubble_11evq_1 p{margin:0}
+    .group\/settings{margin:18px 0;display:flex;flex-direction:column;gap:9px}.settings-card{border:1px solid var(--color-border-default);border-radius:16px;overflow:hidden}.settings-row{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:11px 16px;border-bottom:1px solid var(--color-border-default)}.settings-row:last-child{border-bottom:0}.settings-description{font-size:12px;margin-top:4px}.native-button{background:transparent;color:var(--color-text);border-color:var(--color-border-default);text-shadow:inherit}.native-button.bg-primary-soft-alpha{background:var(--color-background-primary-soft-alpha)}.native-button.bg-text\/5{background:color-mix(in srgb,var(--color-text) 5%,transparent)}
+    [role=switch]{border:0;padding:0;background:transparent}[role=switch]>span{display:inline-flex;align-items:center;width:32px;height:20px;border-radius:99px;background:color-mix(in srgb,var(--color-text) 10%,transparent)}[role=switch][aria-checked=true]>span{background:var(--color-chart-blue)}[role=switch]>span>span{width:16px;height:16px;transform:translateX(2px);border-radius:99px;background:var(--color-control-thumb-on-accent)}[role=switch][aria-checked=true]>span>span{transform:translateX(14px)}
+    .code-sample{margin:14px 0;padding:13px 15px;background:#292c32;border-radius:14px}.code-sample pre{margin:0;font:12px/1.7 ui-monospace,monospace}.token-keyword{color:var(--color-codex-syntax-keyword)}.token-string{color:var(--color-codex-syntax-string)}.composer{max-width:760px;width:100%;margin:12px auto 0;padding:12px 14px;flex-shrink:0;border:1px solid var(--color-border-default);border-radius:14px;background:var(--color-surface)}.ProseMirror{min-height:45px;outline:none;color:var(--color-text);caret-color:var(--color-codex-editor-cursor)}.composer-footer{display:flex;align-items:center;justify-content:space-between;margin-top:8px}.send-button{background:#314c7b;border-color:#314c7b;color:#fff}
+    .native-menu{position:absolute;right:25px;top:72px;width:240px;z-index:100;padding:13px;border:1px solid var(--color-border-default);border-radius:12px;background:var(--color-surface);box-shadow:0 6px 24px #0003}.native-menu[hidden]{display:none}.native-menu strong{display:block;margin:0 7px 8px}.menu-row{display:flex;align-items:center;justify-content:space-between;width:100%;height:35px;padding:7px;border:0;background:transparent;color:var(--color-text);text-align:start}.menu-row:hover{background:color-mix(in srgb,var(--color-text) 10%,transparent)}.menu-note{line-height:1.6;margin:7px;font-size:11px}
+    @media(max-width:900px){aside{width:225px}main{padding:0 13px 10px}#benchmark-options{gap:6px}.thread-scroll-container{padding:16px 3px}}
+  </style>
+</head>
+<body>
+  <form id="benchmark-options" action="/performance" method="get">
+    <label>背景<select name="effect" id="effect"></select></label>
+    <label>性能<select name="performance" id="performance"><option value="balanced">均衡</option><option value="quality">画质</option><option value="economy">节能</option></select></label>
+    <label>主题<select name="theme" id="theme"><option value="light">亮色</option><option value="dark">暗色</option></select></label>
+    <label><input type="checkbox" name="baseline" value="1" id="baseline">rc.7 基线</label>
+    <label><input type="checkbox" name="popup" value="1" id="popup">打开菜单</label>
+    <label>预热秒<input type="number" name="warmup" id="warmup" min="1" max="30" value="3"></label>
+    <label>采样秒<input type="number" name="duration" id="duration" min="10" max="120" value="12"></label>
+    <label>任务数<input type="number" name="rows" id="rows" min="8" max="200" value="64"></label>
+    <label>负载<select name="workload" id="workload"><option value="idle">静置</option><option value="mutate">模拟更新</option></select></label>
+    <button type="submit">应用条件</button><button id="restart" type="button">重新测量</button><button id="snapshot" type="button">显示统计</button>
+  </form>
+  <p id="benchmark-status" role="status">独立合成页面，只测量此页面的调度和 JS 工作，不能代表真实 GPT 的 CPU、GPU 或内存占用。</p>
+  <details id="benchmark-details"><summary>性能报告（完成后自动更新）</summary><pre id="performance-report" data-phase="warmup"></pre></details>
+  <div id="root"><div class="frame" data-app-shell-frame="true">
+    <header data-app-shell-titlebar><span data-app-shell-titlebar-content>Code-Codex Mac</span><span class="text-secondary">独立合成性能对比</span></header>
+    <div class="workspace"><aside class="app-shell-left-panel" data-app-shell-left-panel-appearance="default"><div class="sidebar-navigation"><nav role="navigation" class="_Navigation_1uxfp_2"><h2 class="text-secondary">最近任务</h2><div id="task-list"></div><h2 class="text-secondary">项目</h2><div id="project-list"></div></nav></div></aside>
+      <main data-app-shell-main-surface="default"><div class="thread-scroll-container" data-app-action-timeline-scroll><div class="conversation">
+        <h1 class="text-default">背景与控件的合成负载</h1>
+        <div class="assistant-content text-default">固定同一窗口大小和焦点状态，对比 rc.7 与候选代码的调度、读回和样式写入。<a href="#settings">消息链接</a>保留独立语义。</div>
+        <div data-user-message-bubble class="bg-user-message text-user-message _bubble_11evq_1"><div data-markdown-text-tone="user-message">请保持文字清晰，并降低背景和适配代码的额外开销。</div></div>
+        <div id="settings" class="group/settings" data-density="default"><div class="text-default">常规设置</div>
+          <div class="settings-card rounded-2xl" style="background-color:var(--color-background-panel,var(--color-background-primary-soft-alpha))">
+            <div class="settings-row @container/settings-row"><div><div class="text-default">默认打开位置</div><div class="text-secondary settings-description">透明卡片与原生控件分别适配</div></div><button class="native-button bg-primary-soft-alpha" aria-haspopup="menu">编辑器 ▾</button></div>
+            <div class="settings-row @container/settings-row"><div class="text-default">使用动态背景</div><button role="switch" aria-checked="true" aria-label="使用动态背景"><span><span></span></span></button></div>
+            <div class="settings-row @container/settings-row"><div class="text-default">模拟关闭状态</div><button role="switch" aria-checked="false" aria-label="模拟关闭状态"><span><span></span></span></button></div>
+            <div class="settings-row @container/settings-row"><div class="text-default">后台示例</div><button class="native-button bg-text/5">查看</button></div>
+          </div>
+        </div>
+        <div class="code-sample" data-markdown-copy="code-block"><pre><code><span class="token-keyword">const</span> mode = <span class="token-string">'balanced'</span>;
+// 代码高亮与状态色保留语义</code></pre></div>
+        <div class="assistant-content"><span class="text-success">● 检查通过</span> · <span class="text-danger">● 错误状态示例</span></div>
+        <div id="extra-bubbles"></div>
+      </div></div><div class="composer" data-composer-layout="default" data-composer-surface-variant="default"><div class="ProseMirror text-default" contenteditable="true" role="textbox" aria-label="消息输入框" data-composer-input spellcheck="false">独立输入框；可检查光标与透明度。</div><div class="composer-footer"><span class="text-secondary">75% 透明度 · 文字不透明</span><button class="send-button">发送示例</button></div></div></main>
+    </div>
+  </div><div id="benchmark-menu" role="menu" class="native-menu" hidden><strong class="text-default">合成原生菜单</strong><button role="menuitem" class="menu-row"><span>重命名示例</span><span class="text-tertiary">↵</span></button><button role="menuitem" class="menu-row"><span>复制链接</span><span class="text-info">↗</span></button><button role="menuitem" class="menu-row"><span>检查结果</span><span class="text-success">●</span></button><button role="menuitem" class="menu-row"><span>错误状态示例</span><span class="text-danger">●</span></button><p class="menu-note text-secondary">保持透明表面，用于比较旧版镜像复制与候选版本的合成方式。</p></div></div>
+  <script id="benchmark-catalog" type="application/json">__PERFORMANCE_CATALOG__</script>
+  <script>
+    (()=>{
+      'use strict';
+      const catalog=JSON.parse(document.getElementById('benchmark-catalog').textContent),params=new URLSearchParams(location.search);
+      const bound=(key,fallback,min,max)=>{const n=Number(params.get(key));return params.has(key)&&Number.isFinite(n)?Math.min(max,Math.max(min,n)):fallback;};
+      const effect=catalog.effects.find(e=>e.id===params.get('effect'))?.id||'black-hole';
+      const mode=['balanced','quality','economy'].includes(params.get('performance'))?params.get('performance'):'balanced';
+      const theme=params.get('theme')==='dark'?'dark':'light',baseline=params.has('baseline'),popup=params.has('popup'),workload=params.get('workload')==='mutate'?'mutate':'idle';
+      const rowCount=Math.round(bound('rows',64,8,200)),duration=bound('duration',12,10,120),warmup=bound('warmup',3,1,30);
+      const byId=id=>document.getElementById(id),output=byId('performance-report');
+      for(const e of catalog.effects){const option=document.createElement('option');option.value=e.id;option.textContent=e.name||e.id;byId('effect').append(option);}
+      for(const [id,value] of Object.entries({effect,performance:mode,theme,workload,duration,warmup,rows:rowCount}))byId(id).value=value;
+      byId('baseline').checked=baseline;byId('popup').checked=popup;byId('benchmark-menu').hidden=!popup;document.documentElement.dataset.theme=theme;
+      for(let i=0;i<rowCount;i++){
+        const row=document.createElement('div');row.className='sidebar-item';row.setAttribute('role','button');row.tabIndex=0;
+        if(i%11===0)row.dataset.theme='dark';
+        row.innerHTML='<span class="status-dot '+(i%7===0?'text-danger':'text-success')+'">●</span><div data-thread-title-trigger class="text-default"><span data-thread-title class="text-fade-truncate"></span></div>';
+        row.querySelector('[data-thread-title]').textContent='本地合成任务 '+String(i+1).padStart(3,'0')+' · 检查颜色与性能';byId('task-list').append(row);
+      }
+      for(let i=0;i<8;i++){const row=document.createElement('div');row.className='sidebar-item sidebar-row-focus group/folder-row text-default';row.setAttribute('role','button');row.innerHTML='<svg class="folder-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 3h5l2 2h5v8H2z" fill="none" stroke="currentColor"/></svg><span class="truncate"></span>';row.querySelector('span').textContent='合成项目 '+(i+1);byId('project-list').append(row);}
+      for(let i=0;i<20;i++){const node=document.createElement('div');node.setAttribute('data-user-message-bubble','');node.className='bg-user-message text-user-message _bubble_11evq_1';node.innerHTML='<div data-markdown-text-tone="user-message"></div>';node.firstElementChild.textContent='独立示例消息 '+(i+1)+'：增加滚动区域中需要适配的节点，文本不含真实聊天数据。';byId('extra-bubbles').append(node);}
+      const settings={};for(const e of catalog.effects)settings[e.id]=structuredClone(e.defaults);
+      settings['blinking-squares']={...settings['blinking-squares'],keyboardInteraction:false,mouseInteraction:false};
+      localStorage.setItem('code-codex-mac-backgrounds:v1',JSON.stringify({enabled:true,layoutVersion:4,materialVersion:1,clarityVersion:2,effect,transparency:100,backgroundOpacity:100,composerTransparency:75,codeTransparency:60,codeStyle:'frosted',tone:'auto',performance:mode,settings}));
+      const nativeRAF=window.requestAnimationFrame.bind(window),nativeRect=Element.prototype.getBoundingClientRect,nativePixels=CanvasRenderingContext2D.prototype.getImageData,nativeDraw=CanvasRenderingContext2D.prototype.drawImage;
+      const runtime=()=>window[Symbol.for('code-codex-mac:frames:v1')]?.stats||null;
+      let phase='warmup',started=0,ended=0,startFrame=null,endFrame=null,measurementTimer,warmupTimer,mutateTimer,lastRAF;
+      let counters,intervals,longTasks,visibilityChanges,focusChanges,errors=[],mutationTick=0;
+      const fresh=()=>({rectCalls:0,rectWorkMs:0,pixelReadCalls:0,pixelReadWorkMs:0,pixelsRead:0,drawImageCalls:0,drawImageWorkMs:0,canvasDrawCalls:0,canvasDrawPixels:0,popupDrawCalls:0,popupDrawPixels:0,styleMutations:0,regionStyleMutations:0,fixtureMutations:0});
+      counters=fresh();intervals=[];longTasks=[];visibilityChanges=[];focusChanges=[];
+      Element.prototype.getBoundingClientRect=function(...args){if(phase!=='measuring')return nativeRect.apply(this,args);const t=performance.now();try{return nativeRect.apply(this,args);}finally{counters.rectCalls++;counters.rectWorkMs+=performance.now()-t;}};
+      CanvasRenderingContext2D.prototype.getImageData=function(...args){if(phase!=='measuring')return nativePixels.apply(this,args);const t=performance.now();try{return nativePixels.apply(this,args);}finally{counters.pixelReadCalls++;counters.pixelReadWorkMs+=performance.now()-t;counters.pixelsRead+=Math.max(0,Number(args[2])||0)*Math.max(0,Number(args[3])||0);}};
+      CanvasRenderingContext2D.prototype.drawImage=function(...args){if(phase!=='measuring')return nativeDraw.apply(this,args);const t=performance.now();try{return nativeDraw.apply(this,args);}finally{counters.drawImageCalls++;counters.drawImageWorkMs+=performance.now()-t;if(args[0] instanceof HTMLCanvasElement){const w=args.length===9?args[7]:args.length===5?args[3]:args[0].width,h=args.length===9?args[8]:args.length===5?args[4]:args[0].height,pixels=Math.abs(Number(w)*Number(h))||0;counters.canvasDrawCalls++;counters.canvasDrawPixels+=pixels;if(this.canvas?.hasAttribute('data-cc-mac-popup-mirror')){counters.popupDrawCalls++;counters.popupDrawPixels+=pixels;}}}};
+      const writes=new MutationObserver(records=>{if(phase!=='measuring')return;for(const r of records){counters.styleMutations++;if(r.target.hasAttribute('data-cc-mac-region')||r.target.hasAttribute('data-cc-mac-overlay')||r.target.id==='cc-mac-background-controls')counters.regionStyleMutations++;}});
+      writes.observe(document.body,{subtree:true,attributes:true,attributeFilter:['style']});
+      const longTasksSupported=typeof PerformanceObserver!=='undefined'&&PerformanceObserver.supportedEntryTypes.includes('longtask');
+      if(longTasksSupported){const observer=new PerformanceObserver(list=>{if(phase!=='measuring')return;for(const entry of list.getEntries())if(entry.startTime>=started)longTasks.push({startMs:entry.startTime-started,durationMs:entry.duration});});observer.observe({type:'longtask',buffered:false});}
+      document.addEventListener('visibilitychange',()=>{if(phase==='measuring')visibilityChanges.push({atMs:performance.now()-started,hidden:document.hidden});});
+      for(const event of ['focus','blur'])window.addEventListener(event,()=>{if(phase==='measuring')focusChanges.push({atMs:performance.now()-started,event});});
+      window.addEventListener('error',e=>errors.push({message:e.message,line:e.lineno}));window.addEventListener('unhandledrejection',e=>errors.push({message:String(e.reason?.message||e.reason)}));
+      function pageFrame(time){if(phase==='measuring'){if(lastRAF!==undefined)intervals.push(time-lastRAF);lastRAF=time;}nativeRAF(pageFrame);}nativeRAF(pageFrame);
+      let focusedAtStart=false,hiddenAtStart=false;
+      const round=n=>Math.round(n*1000)/1000,percentile=(sorted,p)=>sorted.length?sorted[Math.min(sorted.length-1,Math.ceil(p*sorted.length)-1)]:null;
+      window.performanceReport=()=>{
+        const elapsed=started?Math.max(0,(ended||performance.now())-started):0,sorted=[...intervals].sort((a,b)=>a-b),stats=endFrame||runtime(),bg=byId('cc-mac-background'),canvas=bg?.querySelector('canvas');
+        const frameDelta=stats&&startFrame?stats.frameCallbacks-startFrame.frameCallbacks:null,workDelta=stats&&startFrame?stats.workMs-startFrame.workMs:null;
+        return {scope:'synthetic page only; not GPT CPU/GPU/system memory',instrumentation:'page-local prototype counters and MutationObserver add equal measurement overhead to both runs',phase,adapterVersion:window.__CCMacBackground__?.version||null,baseline,popup,effect,mode,theme,workload,rowCount,warmupSeconds:warmup,targetSeconds:duration,elapsedMs:round(elapsed),viewport:{width:innerWidth,height:innerHeight,dpr:devicePixelRatio},focusedAtStart,hiddenAtStart,focusedNow:document.hasFocus(),hiddenNow:document.hidden,reducedMotion:matchMedia('(prefers-reduced-motion: reduce)').matches,visibilityChanges,focusChanges,pageRAF:{samples:intervals.length,estimatedHz:intervals.length&&elapsed?round(intervals.length*1000/elapsed):null,p50Ms:percentile(sorted,.5),p95Ms:percentile(sorted,.95),maxMs:sorted.length?sorted[sorted.length-1]:null,over25Ms:intervals.filter(x=>x>25).length,over50Ms:intervals.filter(x=>x>50).length},longTasks:{supported:longTasksSupported,count:longTasks.length,totalMs:round(longTasks.reduce((sum,e)=>sum+e.durationMs,0)),maxMs:longTasks.length?Math.max(...longTasks.map(e=>e.durationMs)):0},counters:Object.fromEntries(Object.entries(counters).map(([key,value])=>[key,round(value)])),background:{frameCallbacks:frameDelta,callbackHz:frameDelta!==null&&elapsed?round(frameDelta*1000/elapsed):null,jsWorkMs:workDelta===null?null:round(workDelta),jsWorkPerSecondMs:workDelta!==null&&elapsed?round(workDelta*1000/elapsed):null,stats,contrastSamples:Number(bg?.dataset.contrastSamples||0),overlayPaints:Number(bg?.dataset.overlayPaints||0),popupMirrors:document.querySelectorAll('[data-cc-mac-popup-mirror]').length,reconciles:Number(bg?.dataset.reconciles||0),regions:bg?.dataset.regions?JSON.parse(bg.dataset.regions):{},canvas:canvas?{width:canvas.width,height:canvas.height,cssWidth:canvas.clientWidth,cssHeight:canvas.clientHeight}:null,status:bg?.dataset.status||null},errors};
+      };
+      function showReport(){output.dataset.phase=phase;output.textContent=JSON.stringify(window.performanceReport(),null,2);}
+      function finish(){if(phase!=='measuring')return;for(const records of [writes.takeRecords()]){counters.styleMutations+=records.length;counters.regionStyleMutations+=records.filter(r=>r.target.hasAttribute('data-cc-mac-region')||r.target.hasAttribute('data-cc-mac-overlay')||r.target.id==='cc-mac-background-controls').length;}ended=performance.now();endFrame=runtime();phase='complete';clearInterval(mutateTimer);showReport();byId('benchmark-status').textContent='采样完成：'+effect+' / '+mode+' / '+(baseline?'rc.7 基线':'候选版本')+'。统计仅代表此合成页面；检查报告中的焦点、可见性与错误。';}
+      function begin(){clearTimeout(measurementTimer);clearInterval(mutateTimer);writes.takeRecords();counters=fresh();intervals=[];longTasks=[];visibilityChanges=[];focusChanges=[];lastRAF=undefined;startFrame=runtime();endFrame=null;started=performance.now();ended=0;focusedAtStart=document.hasFocus();hiddenAtStart=document.hidden;phase='measuring';output.dataset.phase=phase;byId('benchmark-status').textContent='正在采样 '+duration+' 秒：'+effect+' / '+mode+' / '+(baseline?'rc.7 基线':'候选版本')+'；请保持页面前台和窗口大小不变。';
+        if(workload==='mutate')mutateTimer=setInterval(()=>{mutationTick++;const rows=[...byId('task-list').children];const row=rows[mutationTick%rows.length];row.dataset.state=mutationTick%2?'open':'closed';row.querySelector('[data-thread-title]').textContent='更新中的合成任务 '+mutationTick;const content=byId('extra-bubbles').children[mutationTick%20].firstElementChild;content.textContent='合成流式更新 '+mutationTick+'，不会读取真实 GPT 数据。';counters.fixtureMutations+=3;},250);
+        measurementTimer=setTimeout(finish,duration*1000);
+      }
+      function restart(){clearTimeout(warmupTimer);clearTimeout(measurementTimer);clearInterval(mutateTimer);phase='warmup';started=ended=0;output.dataset.phase=phase;byId('benchmark-status').textContent='预热 '+warmup+' 秒后自动采样 '+duration+' 秒（独立合成页面）。';warmupTimer=setTimeout(begin,warmup*1000);}
+      byId('restart').onclick=restart;byId('snapshot').onclick=showReport;for(const button of document.querySelectorAll('[role=switch]'))button.onclick=()=>button.setAttribute('aria-checked',String(button.getAttribute('aria-checked')!=='true'));restart();
+    })();
+  </script>
+  <script src="/payload.js"></script>
+</body>
+</html>

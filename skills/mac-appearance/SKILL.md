@@ -11,7 +11,7 @@ The user chose a one-click Dock launcher that preserves the official GPT bundle,
 
 The launch intent enables the last selected background, resumes its animation and preserves parameters. Repeated Dock clicks activate the owned GPT window; an already running ordinary GPT session requires a normal exit and restart. The menu bar **✦** exposes settings, restore and uninstall. Agent-side `--startup-check`, `--self-test`, install and Dock state commands do not launch or connect to GPT.
 
-Within GPT, **Preview Market → Appearance** controls backgrounds and **Mac 设置** controls performance, 75% composer transparency (25% tint) and code-block frosting. Text opacity stays at 100%. The companion plugin has no native theme API or automatic lifecycle hook.
+Within GPT, **Preview Market → Appearance** controls backgrounds and **Mac 设置** controls performance, 75% composer transparency (25% tint) and code-block frosting. Text opacity stays at 100%. Neutral text stays white with a fine dark outline; background animation does not switch its color. Balanced runs complex backdrops at 30 fps, lighter effects at up to 60 fps; unfocused windows use 15 fps, hidden pages pause. Quality keeps 60 fps. The companion plugin has no native theme API or automatic lifecycle hook.
 
 The public build contains four effects with retained upstream source records. A separately built personal-local manager may contain the user's existing local eight-effect runtime; never upload that private build as a public artifact. Unknown licensing is not fixed by adding an attribution.
 

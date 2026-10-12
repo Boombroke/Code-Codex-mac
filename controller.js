@@ -34,16 +34,14 @@
   let renderer, canvas, media, mediaURL, mediaFile, disposed=false, mountRevision=0;
   let surface, contentSurface, positionLease, reconcileFrame=0,reconcileTimer,renderFailed=false;
   let surfaceDirty=true,regionsDirty=true,geometryDirty=true,overlaysDirty=true,backgroundBounds;
-  let lastOverlayPaint=-Infinity,overlayPaints=0,lastCounterUpdate=0,policy;
+  let lastCounterUpdate=0,policy;
   const regions=new Map();
   const overlays=new Map(),themeLeases=new Map();
   let theme,resolvedTone='dark';const themeStyleSnapshot=new WeakMap();
-  const contrast=window.__CC_MAC_CONTRAST__(),controlContrast=window.__CC_MAC_CONTROL_CONTRAST__(),inkTones=new WeakMap();
-  const sample=document.createElement('canvas');sample.width=32;sample.height=18;
-  const sampleContext=sample.getContext('2d',{willReadFrequently:true});
-  let samplePixels,lastSample=-Infinity,contrastSamples=0;
+  const contrast=window.__CC_MAC_CONTRAST__();
+  const stableInk=contrast.stablePalette().vars;
   const frameRuntime=window[Symbol.for('code-codex-mac:frames:v1')];
-  if(frameRuntime)frameRuntime.onFrame=({count,time})=>{if(!canvas&&config.effect==='blinking-squares')canvas=layer.querySelector('canvas');if(time-lastCounterUpdate>=1000){background.dataset.frames=String(count);lastCounterUpdate=time;}updateContrast(time,false,true);if(overlays.size&&time-lastOverlayPaint>=32){paintOverlays(true);lastOverlayPaint=time;}};
+  if(frameRuntime)frameRuntime.onFrame=({count,time})=>{if(!canvas&&config.effect==='blinking-squares')canvas=layer.querySelector('canvas');if(time-lastCounterUpdate>=1000){background.dataset.frames=String(count);lastCounterUpdate=time;}};
   const reduced=matchMedia('(prefers-reduced-motion: reduce)');
   const background=document.createElement('div');
   background.id='cc-mac-background';
@@ -83,7 +81,7 @@
       --color-surface:var(--cc-theme-surface);--color-surface-secondary:var(--cc-theme-surface);--color-surface-tertiary:var(--cc-theme-surface);--color-surface-canvas:var(--cc-theme-surface);--color-surface-card:var(--cc-theme-surface);--color-surface-elevated:var(--cc-theme-surface);--color-surface-elevated-secondary:var(--cc-theme-surface);--color-surface-default:var(--cc-theme-surface);
       --color-text:var(--cc-theme-fg);--color-text-default:var(--cc-theme-fg);--color-text-primary:var(--cc-theme-fg);--color-text-foreground:var(--cc-theme-fg);--color-text-emphasis:var(--cc-theme-fg);--color-text-composer-primary:var(--cc-theme-fg);--color-text-secondary:var(--cc-theme-muted);--color-text-tertiary:var(--cc-theme-muted);--color-text-accent:var(--cc-theme-accent);--color-accent-blue:var(--cc-theme-accent);
       --color-border:var(--cc-theme-border);--color-border-default:var(--cc-theme-border);--color-border-light:var(--cc-theme-border);--color-border-subtle:var(--cc-theme-border);
-      color:var(--cc-theme-fg);color-scheme:var(--cc-theme-scheme);text-shadow:var(--cc-theme-shadow);
+      color:var(--cc-theme-fg);color-scheme:var(--cc-theme-scheme);text-shadow:var(--cc-theme-shadow);-webkit-text-stroke:var(--cc-theme-stroke);paint-order:stroke fill;
     }
     [data-cc-mac-background-surface][data-cc-mac-active] :is([data-cc-mac-region="sidebar"],[data-cc-mac-region="header"],[data-cc-mac-region="composer"],[data-cc-mac-region="bubble"],[data-cc-mac-region="panel"]), [data-cc-mac-overlay] {
       background-color:var(--cc-theme-surface)!important;background-image:none!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important;border-color:var(--cc-theme-border)!important;
@@ -154,13 +152,13 @@
   `;
   style.textContent+=`
     [data-cc-mac-background-surface][data-cc-mac-active] [data-cc-mac-region], [data-cc-mac-overlay] {
-      color:var(--cc-theme-fg);text-shadow:var(--cc-theme-shadow);
+      color:var(--cc-theme-fg);text-shadow:var(--cc-theme-shadow);-webkit-text-stroke:var(--cc-theme-stroke);paint-order:stroke fill;
     }
     [data-cc-mac-background-surface][data-cc-mac-active] :is([data-composer-input],.ProseMirror,textarea,input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"])) {
       caret-color:var(--cc-theme-fg)!important;color:var(--cc-theme-fg);--color-codex-editor-cursor:var(--cc-theme-fg);
     }
     [data-cc-mac-background-surface][data-cc-mac-active] :is(textarea,input)::placeholder {color:var(--cc-theme-muted);opacity:1}
-    [data-cc-mac-background-surface][data-cc-mac-active] :is([data-variant="solid"],[role="switch"],.bg-background-primary-solid) {text-shadow:none}
+    [data-cc-mac-background-surface][data-cc-mac-active] :is([data-variant="solid"],[role="switch"],.bg-background-primary-solid,[aria-disabled="true"],:disabled) {text-shadow:none;-webkit-text-stroke:0}
   `;
   // Settings groups have an inline native panel token, rather than a surface
   // utility class. Clear only their shells; stateful controls keep their colors.
@@ -170,7 +168,7 @@
       backdrop-filter:none!important;-webkit-backdrop-filter:none!important;
       border-color:var(--cc-theme-border)!important;
     }
-    [data-cc-mac-background-surface][data-cc-mac-active] [data-cc-mac-region="settings-row"] :is(button,[role="combobox"]) {text-shadow:none}
+    [data-cc-mac-background-surface][data-cc-mac-active] [data-cc-mac-region="settings-row"] :is(button,[role="combobox"]) {text-shadow:none;-webkit-text-stroke:0}
     [data-cc-mac-background-surface][data-cc-mac-active] [data-cc-mac-region="settings-row"] [role="switch"][aria-checked="false"] > span {
       border:1px solid var(--cc-theme-border);
     }
@@ -216,7 +214,7 @@
     surface?.toggleAttribute('data-cc-mac-opacity-active',config.enabled&&config.opacityEnabled&&!renderFailed);
     const accents={'black-hole':'#ffb36a','heavenly-cloud':'#9ed8ff','mountain':'#ffcb91','cloud-train':'#bfe7ff','blinking-squares':settings().squareColor,'milky-way':settings().colors?.[0]};
     resolvedTone=['light','dark'].includes(config.tone)?config.tone:contrast.nativeTone({theme:document.documentElement.dataset.theme||document.body.dataset.theme,className:document.documentElement.className,variant:getComputedStyle(document.documentElement).getPropertyValue('--theme-variant'),prefersDark:matchMedia('(prefers-color-scheme: dark)').matches});
-    theme=window.__CC_MAC_THEME__({transparency:config.transparency,backgroundOpacity:config.backgroundOpacity,tone:resolvedTone,hue:settings().hue||0,accent:accents[config.effect]});
+    theme=window.__CC_MAC_THEME__({transparency:config.transparency,backgroundOpacity:config.backgroundOpacity,tone:'dark',hue:settings().hue||0,accent:accents[config.effect]});
     veil.hidden=true;veil.style.background='transparent';
     layer.style.filter=config.blur>0?`blur(${config.blur}px)`:'none';
     layer.style.opacity=String(theme.backgroundOpacity/100);
@@ -224,7 +222,6 @@
     if(!config.enabled||renderFailed)for(const node of [...themeLeases.keys()])if(node!==controls)restoreThemeVars(node);
     if(surface)applyThemeVars(surface);applyThemeVars(controls);
     for(const node of regions.keys())applyThemeVars(node);
-    updateContrast(performance.now(),true);
     syncOverlays();
     ui?.render();
   }
@@ -234,8 +231,8 @@
     const selected=node===controls&&(!config.enabled||renderFailed)?window.__CC_MAC_THEME__({transparency:0,tone:'dark'}):theme;
     if(!themeLeases.has(node))themeLeases.set(node,new Map());
     const lease=themeLeases.get(node);
-    const material=window.__CC_MAC_MATERIALS__({composerTransparency:config.composerTransparency,codeTransparency:config.codeTransparency,codeStyle:config.codeStyle,tone:resolvedTone,performance:config.performance});
-    const variables={...selected.vars,...material.vars};
+    const material=window.__CC_MAC_MATERIALS__({composerTransparency:config.composerTransparency,codeTransparency:config.codeTransparency,codeStyle:config.codeStyle,tone:'dark',performance:config.performance});
+    const variables={...selected.vars,...material.vars,...stableInk};
     if(['frame','main','sidebar','sidebar-nav','sidebar-item','bubble','settings','settings-panel','settings-row','settings-control'].includes(node.getAttribute('data-cc-mac-region')))variables['--cc-theme-surface']='transparent';
     if(['settings','settings-panel','settings-row','settings-control'].includes(node.getAttribute('data-cc-mac-region')))Object.assign(variables,{
       '--color-background-panel':'transparent',
@@ -260,47 +257,6 @@
     }
     themeStyleSnapshot.set(node,node.getAttribute('style'));
   }
-  function backdropRGB(node,pixels) {
-    if(!samplePixels||!backgroundBounds){const rgb=config.effect==='mountain'?[190,168,145]:[18,25,35];pixels?.push(rgb);return rgb;}
-    const bounds=backgroundBounds,r=node.getBoundingClientRect(),rgb=[0,0,0];let count=0;
-    const x0=Math.max(0,Math.floor((r.left-bounds.left)/bounds.width*32)),x1=Math.min(32,Math.ceil((r.right-bounds.left)/bounds.width*32));
-    const y0=Math.max(0,Math.floor((r.top-bounds.top)/bounds.height*18)),y1=Math.min(18,Math.ceil((r.bottom-bounds.top)/bounds.height*18));
-    for(let y=y0;y<y1;y++)for(let x=x0;x<x1;x++){const i=(y*32+x)*4;rgb.forEach((_,c)=>rgb[c]+=samplePixels[i+c]);pixels?.push([samplePixels[i],samplePixels[i+1],samplePixels[i+2]]);count++;}
-    return count?rgb.map(v=>v/count):[18,25,35];
-  }
-  function applyContrast(node) {
-    if(!node||!theme)return;
-    const role=node.getAttribute('data-cc-mac-region');
-    const alpha=role==='composer'?1-config.composerTransparency/100:role==='code'&&config.codeStyle!=='transparent'?1-config.codeTransparency/100:['sidebar','sidebar-nav','sidebar-item','main','bubble','frame','settings','settings-panel','settings-row','settings-control'].includes(role)?0:theme.alpha;
-    const controlPixels=role==='settings-control'?[]:undefined;
-    const rgb=contrast.composite(backdropRGB(node,controlPixels),resolvedTone==='light'?[245,248,252]:[18,23,32],alpha);
-    const palette=contrast.palette(rgb,inkTones.get(node));inkTones.set(node,palette.tone);
-    if(controlPixels){palette.vars['--cc-theme-scheme']=palette.tone;Object.assign(palette.vars,controlContrast.surface(controlPixels.length?controlPixels:[rgb],palette.tone).vars);}
-    const lease=themeLeases.get(node);if(!lease)return;
-    for(const [key,value]of Object.entries(palette.vars)){
-      if(!lease.has(key))lease.set(key,{value:node.style.getPropertyValue(key),priority:node.style.getPropertyPriority(key)});
-      if(node.style.getPropertyValue(key)!==value)node.style.setProperty(key,value);
-    }
-    themeStyleSnapshot.set(node,node.getAttribute('style'));
-  }
-  function updateContrast(time,force=false,painted=false) {
-    if(disposed||!surface||!config.enabled||renderFailed||document.hidden)return;
-    const source=canvas||media;
-    if(source&&sampleContext&&(source===media||painted)&&time-lastSample>=1500){
-      lastSample=time;
-      const sw=source.videoWidth||source.naturalWidth||source.width,sh=source.videoHeight||source.naturalHeight||source.height;
-      const bg=backgroundBounds||background.getBoundingClientRect();
-      if(sw&&sh&&bg.width&&bg.height)try {
-        sampleContext.fillStyle='#080911';sampleContext.fillRect(0,0,32,18);
-        sampleContext.globalAlpha=config.backgroundOpacity/100;
-        if(source===media){const scale=Math.max(bg.width/sw,bg.height/sh),cw=bg.width/scale,ch=bg.height/scale;sampleContext.drawImage(source,(sw-cw)/2,(sh-ch)/2,cw,ch,0,0,32,18);}
-        else sampleContext.drawImage(source,0,0,32,18);
-        sampleContext.globalAlpha=1;samplePixels=sampleContext.getImageData(0,0,32,18).data;contrastSamples++;background.dataset.contrastSamples=String(contrastSamples);
-      }catch{samplePixels=undefined;}
-    }else if(!force)return;
-    applyContrast(surface);for(const node of regions.keys())applyContrast(node);
-    for(const node of overlays.keys())applyContrast(node);applyContrast(controls);
-  }
   function restoreThemeVars(node) {
     const lease=themeLeases.get(node);if(!lease)return;
     for(const [key,previous] of lease)if(previous.value)node.style.setProperty(key,previous.value,previous.priority);else node.style.removeProperty(key);
@@ -308,11 +264,8 @@
   }
   function removeOverlay(node) {
     const entry=overlays.get(node);if(!entry)return;
-    resizeObserver.unobserve(node);entry.mirror.remove();
+    resizeObserver.unobserve(node);
     if(entry.attribute===null)node.removeAttribute('data-cc-mac-overlay');else node.setAttribute('data-cc-mac-overlay',entry.attribute);
-    if(entry.position&&node.style.getPropertyValue('position')==='relative') {
-      if(entry.position.value)node.style.setProperty('position',entry.position.value,entry.position.priority);else node.style.removeProperty('position');
-    }
     restoreThemeVars(node);overlays.delete(node);
   }
   function clearOverlays() {for(const node of [...overlays.keys()])removeOverlay(node);}
@@ -329,49 +282,20 @@
     let redraw=false;
     for(const node of active) {
       if(!overlays.has(node)) {
-        const mirror=document.createElement('canvas');mirror.setAttribute('aria-hidden','true');mirror.dataset.ccMacPopupMirror='';
-        mirror.style.cssText='position:absolute;inset:0;width:100%;height:100%;z-index:-1;pointer-events:none;border-radius:inherit';
-        const entry={mirror,ctx:mirror.getContext('2d',{alpha:false,desynchronized:true}),attribute:node.getAttribute('data-cc-mac-overlay'),position:undefined};
-        if(getComputedStyle(node).position==='static'){entry.position={value:node.style.getPropertyValue('position'),priority:node.style.getPropertyPriority('position')};node.style.setProperty('position','relative');}
-        overlays.set(node,entry);node.setAttribute('data-cc-mac-overlay','');node.append(mirror);resizeObserver.observe(node);
+        const entry={attribute:node.getAttribute('data-cc-mac-overlay')};
+        overlays.set(node,entry);node.setAttribute('data-cc-mac-overlay','');resizeObserver.observe(node);
         redraw=true;
       }
-      applyThemeVars(node);applyContrast(node);const rect=entryRect(node);overlays.get(node).rect=rect;
+      applyThemeVars(node);
     }
     if(redraw){frameRuntime?.invalidate();refreshMotion();}
-    paintOverlays();
-  }
-  function entryRect(node){const r=node.getBoundingClientRect(),border=parseFloat(getComputedStyle(node).borderLeftWidth)||0;return {left:r.left+border,top:r.top+border,width:Math.max(0,r.width-border*2),height:Math.max(0,r.height-border*2)};}
-  function paintOverlays(fromFrame=false) {
-    if(!surface||!config.enabled||renderFailed||!overlays.size)return;
-    const source=canvas||media;
-    const bg=backgroundBounds;if(!bg)return;
-    for(const [node,entry] of overlays) {
-      const mirror=entry.mirror;
-      if(mirror.style.opacity!==String(config.backgroundOpacity/100))mirror.style.opacity=String(config.backgroundOpacity/100);
-      if(source instanceof HTMLCanvasElement&&!fromFrame)continue;
-      if(!source||!entry.rect?.width||!bg.width||!bg.height){mirror.hidden=true;continue;}
-      mirror.hidden=false;const r=entry.rect;
-      if(!r.width||!r.height){mirror.hidden=true;continue;}
-      const sw=source.videoWidth||source.naturalWidth||source.width,sh=source.videoHeight||source.naturalHeight||source.height;
-      if(!sw||!sh){mirror.hidden=true;continue;}
-      const dpr=Math.min(frameRuntime?.renderDpr||devicePixelRatio,source instanceof HTMLCanvasElement?sw/bg.width:Infinity),w=Math.max(1,Math.round(r.width*dpr)),h=Math.max(1,Math.round(r.height*dpr));
-      if(mirror.width!==w)mirror.width=w;if(mirror.height!==h)mirror.height=h;
-      const ctx=entry.ctx;
-      try {
-        let sx=(r.left-bg.left)*sw/bg.width,sy=(r.top-bg.top)*sh/bg.height,sourceWidth=r.width*sw/bg.width,sourceHeight=r.height*sh/bg.height;
-        if(source===media){const scale=Math.max(bg.width/sw,bg.height/sh);sx=(r.left-bg.left+(sw*scale-bg.width)/2)/scale;sy=(r.top-bg.top+(sh*scale-bg.height)/2)/scale;sourceWidth=r.width/scale;sourceHeight=r.height/scale;}
-        ctx.fillStyle='#080911';ctx.fillRect(0,0,w,h);ctx.drawImage(source,sx,sy,sourceWidth,sourceHeight,0,0,w,h);
-        mirror.hidden=false;overlayPaints++;
-      }catch{mirror.hidden=true;}
-    }
   }
   function releaseRenderer() {
     renderer?.dispose(); renderer=undefined;
     for(const effect of catalog.effects)registrations?.delete(effect.id);
     media?.pause?.(); media?.removeAttribute('src'); media=undefined;
     if(mediaURL)URL.revokeObjectURL(mediaURL); mediaURL=undefined;
-    layer.replaceChildren(); canvas=undefined;samplePixels=undefined;lastSample=-Infinity;
+    layer.replaceChildren(); canvas=undefined;
   }
   async function setMedia(file,save=true) {
     if(!/^(image\/(png|jpeg|webp|gif)|video\/(mp4|webm))$/.test(file.type))throw Error('请选择 PNG、JPEG、WebP、GIF、MP4 或 WebM');
@@ -390,7 +314,6 @@
     if(media.tagName==='VIDEO') { media.muted=true;media.loop=true;media.playsInline=true; }
     layer.append(media);
     const current=media;
-    for(const event of ['load','loadeddata','timeupdate'])current.addEventListener(event,()=>updateContrast(performance.now(),event!=='timeupdate'),{signal:abort.signal});
     current.addEventListener('error',()=>status('该媒体无法解码，请换一个文件'),{signal:abort.signal});
     refreshMotion();
     status('本地媒体：'+file.name);
@@ -446,7 +369,7 @@
     read:()=>({...config,fixedTransparentRegions,failed:renderFailed,notice:background.dataset.status}),
     settings,
     bounds:()=>surface?.getBoundingClientRect(),
-    overlays:()=>{overlaysDirty=true;frameRuntime?.invalidate();syncOverlays();paintOverlays();},
+    overlays:()=>{overlaysDirty=true;frameRuntime?.invalidate();syncOverlays();},
     enable:id=>{config.enabled=!(config.enabled&&config.effect===id);config.effect=id;config.paused=false;mount();persist();},
     update:(id,key,value)=>{
       const next=settings(id);
@@ -472,7 +395,7 @@
   },abort.signal);
   function diagnostics() {
     const rect=surface?.getBoundingClientRect();
-    const report={version:'1.0.0-rc.7',upstream:catalog.commit,effect:config.effect,enabled:config.enabled,paused:config.paused||settings().paused,visibility:document.visibilityState,reduceMotion:reduced.matches,frameCallbacks:frameRuntime?.frameCount,performance:policy,resolvedTone,contrastSamples,contrastGrid:[32,18],frameStats:frameRuntime?.stats,overlayPaints,regions:JSON.parse(background.dataset.regions||'{}'),scope:surface?{tag:surface.tagName,id:surface.id,width:rect.width,height:rect.height}:null,canvas:canvas?{width:canvas.width,height:canvas.height,cssWidth:canvas.clientWidth,cssHeight:canvas.clientHeight,dpr:devicePixelRatio}:null,blur:config.blur,transparency:config.transparency,opacity:config.opacity,backgroundOpacity:config.backgroundOpacity,composerTransparency:config.composerTransparency,codeStyle:config.codeStyle,codeTransparency:config.codeTransparency};
+    const report={version:'1.0.0-rc.8',upstream:catalog.commit,effect:config.effect,enabled:config.enabled,paused:config.paused||settings().paused,visibility:document.visibilityState,reduceMotion:reduced.matches,frameCallbacks:frameRuntime?.frameCount,performance:policy,resolvedTone,foreground:'fixed-white-outline',backgroundReadback:false,frameStats:frameRuntime?.stats,popupRendering:'css',regions:JSON.parse(background.dataset.regions||'{}'),scope:surface?{tag:surface.tagName,id:surface.id,width:rect.width,height:rect.height}:null,canvas:canvas?{width:canvas.width,height:canvas.height,cssWidth:canvas.clientWidth,cssHeight:canvas.clientHeight,dpr:devicePixelRatio}:null,blur:config.blur,transparency:config.transparency,opacity:config.opacity,backgroundOpacity:config.backgroundOpacity,composerTransparency:config.composerTransparency,codeStyle:config.codeStyle,codeTransparency:config.codeTransparency};
     if(!navigator.clipboard?.writeText){status('当前应用未提供剪贴板接口');return;}
     void navigator.clipboard.writeText(JSON.stringify(report,null,2)).then(()=>status('诊断已复制（不含聊天内容）')).catch(()=>status('复制失败，请检查剪贴板权限'));
   }
@@ -515,8 +438,10 @@
   const resizeObserver=new ResizeObserver(entries=>{if(entries.some(entry=>entry.target===surface))surfaceDirty=true;geometryDirty=true;overlaysDirty=true;scheduleReconcile();});
   function applyRenderPolicy(){
     const bounds=surface?.getBoundingClientRect();
-    policy=window.__CC_MAC_RENDER_POLICY__({mode:config.performance,dpr:devicePixelRatio,width:bounds?.width||innerWidth,height:bounds?.height||innerHeight,focused:document.hasFocus()});
+    const previousDensity=policy?.renderDpr;
+    policy=window.__CC_MAC_RENDER_POLICY__({mode:config.performance,dpr:devicePixelRatio,width:bounds?.width||innerWidth,height:bounds?.height||innerHeight,effect:config.effect,focused:document.hasFocus()});
     frameRuntime?.configure(policy);
+    return previousDensity!==undefined&&Math.abs(previousDensity-policy.renderDpr)>.025;
   }
   window.addEventListener('focus',applyRenderPolicy,{signal:abort.signal});
   window.addEventListener('blur',applyRenderPolicy,{signal:abort.signal});
@@ -557,7 +482,7 @@
     for(const node of surface.querySelectorAll(bubbleSelector))mark(node,'bubble');
     for(const node of surface.querySelectorAll(panelSelector))if(!seen.has(node)&&!node.matches('button,a,[role="button"]')&&!node.closest('[data-cc-mac-region="code"],[data-cc-mac-region="composer"]'))mark(node,'panel');
     for(const [node,previous]of regions)if(!seen.has(node)){restoreThemeVars(node);if(previous===null)node.removeAttribute('data-cc-mac-region');else node.setAttribute('data-cc-mac-region',previous);regions.delete(node);}
-    if(theme&&config.enabled)for(const node of seen){applyThemeVars(node);applyContrast(node);}
+    if(theme&&config.enabled)for(const node of seen){applyThemeVars(node);}
     const counts={};for(const node of regions.keys()){const role=node.getAttribute('data-cc-mac-region');counts[role]=(counts[role]||0)+1;}background.dataset.regions=JSON.stringify(counts);
   }
   function detachSurface() {
@@ -608,9 +533,8 @@
       if(background.parentElement!==surface){surface.prepend(background);mount();}
       if(!controls.isConnected)document.body.append(controls);
     }
-    if(geometryDirty){positionControls();backgroundBounds=background.getBoundingClientRect();applyRenderPolicy();}
+    if(geometryDirty){positionControls();backgroundBounds=background.getBoundingClientRect();if(applyRenderPolicy()&&renderer)mount();}
     if(overlaysDirty||geometryDirty)syncOverlays();
-    if(surface)updateContrast(performance.now(),true);
     surfaceDirty=regionsDirty=geometryDirty=overlaysDirty=false;
     background.dataset.reconciles=String(Number(background.dataset.reconciles||0)+1);
   }
@@ -619,6 +543,6 @@
   window.addEventListener('scroll',()=>{if(surface){geometryDirty=true;overlaysDirty=true;scheduleReconcile();}},{capture:true,passive:true,signal:abort.signal});
   for(const target of [document,shadow])target.addEventListener('animationend',event=>{if(event.target instanceof Element&&event.target.matches(overlaySelector)){overlaysDirty=true;scheduleReconcile();}},{capture:true,signal:abort.signal});
   function dispose() {if(disposed)return;disposed=true;ui?.close();abort.abort();themeObserver.disconnect();layoutObserver.disconnect();cancelAnimationFrame(reconcileFrame);clearTimeout(reconcileTimer);detachSurface();for(const node of [...themeLeases.keys()])restoreThemeVars(node);frameRuntime?.dispose();style.remove();delete window[API];}
-  window[API]=Object.freeze({version:'1.0.0-rc.7',dispose});
+  window[API]=Object.freeze({version:'1.0.0-rc.8',dispose});
   reconcile();persist();
 })();

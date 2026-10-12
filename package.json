@@ -1,6 +1,6 @@
 {
   "name": "code-codex-mac",
-  "version": "1.0.0-rc.7",
+  "version": "1.0.0-rc.8",
   "private": true,
   "type": "module",
   "description": "One-click native macOS Dock launcher for Code-Codex appearance",

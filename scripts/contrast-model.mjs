@@ -6,25 +6,22 @@ export function createContrastModel() {
   };
   const composite=(background,tint,alpha)=>background.map((v,i)=>v*(1-alpha)+tint[i]*alpha);
   const ratio=(a,b)=>(Math.max(a,b)+.05)/(Math.min(a,b)+.05);
-  function palette(rgb,previous) {
-    const l=luminance(rgb);
-    // Hysteresis prevents text flipping back and forth on animated midtones.
-    let dark=previous==='light'?l>.15:previous==='dark'?l>.21:l>.18;
-    if(ratio(l,dark?luminance([2,4,6]):1)<4.5)dark=!dark;
-    const foreground=dark?'#020406':'#ffffff';
-    const soft=dark?[24,35,45]:[241,245,249];
-    const muted=ratio(l,luminance(soft))>=4.5?(dark?'#18232d':'#f1f5f9'):foreground;
-    const shadow=dark?'0 1px 2px rgba(255,255,255,.55)':'0 1px 2px rgba(0,0,0,.65)';
-    const safeColor=hex=>{const rgb=[1,3,5].map(i=>parseInt(hex.slice(i,i+2),16));return ratio(l,luminance(rgb))>=4.5?hex:foreground;};
-    const syntax=dark?{comment:muted,keyword:'#772149',literal:'#763312',string:'#155e2c',variable:'#54318e',attribute:'#68400b',name:'#124978',error:'#8b2020'}:{comment:muted,keyword:'#ffd2e8',literal:'#ffd1b3',string:'#c2f3cf',variable:'#e6d6ff',attribute:'#ffedba',name:'#c2e2ff',error:'#ffc5c5'};
-    const syntaxVars=Object.fromEntries(Object.entries(syntax).map(([name,color])=>['--color-codex-syntax-'+name,safeColor(color)]));
-    return {tone:dark?'light':'dark',luminance:l,contrast:ratio(l,luminance(dark?[2,4,6]:[255,255,255])),vars:{
-      '--cc-theme-fg':foreground,'--cc-theme-muted':muted,
-      '--cc-theme-accent':safeColor(dark?'#003f80':'#c2e2ff'),...syntaxVars,
-      '--cc-settings-control-surface':dark?'rgba(245,248,252,.16)':'rgba(13,19,28,.16)',
-      '--cc-settings-control-hover':dark?'rgba(245,248,252,.24)':'rgba(13,19,28,.24)',
-      '--cc-theme-border':dark?'rgba(13,20,27,.28)':'rgba(255,255,255,.3)',
-      '--cc-theme-shadow':shadow,
+  // Stable text avoids animated backgrounds switching the same label between
+  // black and white. The controller also edges inherited accent/syntax text without changing its fill.
+  const syntax={comment:'#e2e8f0',keyword:'#ffd2e8',literal:'#ffd1b3',string:'#c2f3cf',variable:'#e6d6ff',attribute:'#ffedba',name:'#c2e2ff',error:'#ffc5c5'};
+  const syntaxVars=Object.fromEntries(Object.entries(syntax).map(([name,color])=>['--color-codex-syntax-'+name,color]));
+  function stablePalette() {
+    return {tone:'dark',vars:{
+      '--cc-theme-fg':'#ffffff','--cc-theme-muted':'#e2e8f0',
+      '--cc-theme-accent':'#c2e2ff',...syntaxVars,
+      // Small controls retain enough dark backing for unoutlined white labels.
+      // This does not change the composer's separately configured transparency.
+      '--cc-settings-control-surface':'rgba(13,19,28,.64)',
+      '--cc-settings-control-hover':'rgba(13,19,28,.72)',
+      '--cc-theme-border':'rgba(255,255,255,.28)',
+      '--cc-theme-stroke':'0.55px rgba(0,0,0,.95)',
+      '--cc-theme-shadow':'0 1px 1px rgba(0,0,0,.7)',
+      '--cc-theme-scheme':'dark',
     }};
   }
   function nativeTone({theme,className='',variant='',prefersDark=false}={}) {
@@ -34,5 +31,6 @@ export function createContrastModel() {
     if(variant.trim()==='light'||variant.trim()==='dark')return variant.trim();
     return prefersDark?'dark':'light';
   }
-  return {luminance,composite,ratio,palette,nativeTone};
+  // Keep the old method name usable for callers while they stop sampling.
+  return {luminance,composite,ratio,stablePalette,palette:stablePalette,nativeTone};
 }
