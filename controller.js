@@ -53,6 +53,9 @@
   const veil=document.createElement('div');
   veil.style.cssText='position:absolute;inset:0;pointer-events:none';
   background.append(layer,veil);
+  const settingsRootSelector='[class~="group/settings"][data-density]';
+  const settingsPanelSelector=settingsRootSelector+' [style*="--color-background-panel"]';
+  const settingsRowSelector=settingsRootSelector+' [class~="@container/settings-row"]';
   const codeSelector='[data-markdown-copy="code-block"],[class*="CodeBlock_"],.message-code-block,.bg-token-text-code-block-background';
   const style=document.createElement('style');
   style.id='cc-mac-background-style';
@@ -154,6 +157,22 @@
     [data-cc-mac-background-surface][data-cc-mac-active] :is(textarea,input)::placeholder {color:var(--cc-theme-muted);opacity:1}
     [data-cc-mac-background-surface][data-cc-mac-active] :is([data-variant="solid"],[role="switch"],.bg-background-primary-solid) {text-shadow:none}
   `;
+  // Settings groups have an inline native panel token, rather than a surface
+  // utility class. Clear only their shells; stateful controls keep their colors.
+  style.textContent+=`
+    [data-cc-mac-background-surface][data-cc-mac-active] [data-cc-mac-region="settings-panel"] {
+      background-color:transparent!important;background-image:none!important;
+      backdrop-filter:none!important;-webkit-backdrop-filter:none!important;
+      border-color:var(--cc-theme-border)!important;
+    }
+    [data-cc-mac-background-surface][data-cc-mac-active] [data-cc-mac-region="settings-row"] :is(button,[role="combobox"]) {text-shadow:none}
+    [data-cc-mac-background-surface][data-cc-mac-active] [data-cc-mac-region="settings-row"] [role="switch"][aria-checked="false"] > span {
+      border:1px solid var(--cc-theme-border);
+    }
+    [data-cc-mac-background-surface][data-cc-mac-active] [data-cc-mac-region="settings-row"] [role="switch"][aria-checked="false"] > span > span {
+      background-color:var(--cc-theme-fg)!important;border-color:var(--cc-theme-fg)!important;
+    }
+  `;
   document.head.append(style);
   const controls=document.createElement('div');
   controls.id='cc-mac-background-controls';
@@ -208,7 +227,16 @@
     const lease=themeLeases.get(node);
     const material=window.__CC_MAC_MATERIALS__({composerTransparency:config.composerTransparency,codeTransparency:config.codeTransparency,codeStyle:config.codeStyle,tone:resolvedTone,performance:config.performance});
     const variables={...selected.vars,...material.vars};
-    if(['frame','main','sidebar','bubble'].includes(node.getAttribute('data-cc-mac-region')))variables['--cc-theme-surface']='transparent';
+    if(['frame','main','sidebar','bubble','settings','settings-panel','settings-row'].includes(node.getAttribute('data-cc-mac-region')))variables['--cc-theme-surface']='transparent';
+    if(['settings','settings-panel','settings-row'].includes(node.getAttribute('data-cc-mac-region')))Object.assign(variables,{
+      '--color-background-panel':'transparent',
+      '--color-background-primary-soft-alpha':'transparent',
+      '--color-background-primary-soft':'var(--cc-theme-hover)',
+      '--color-background-primary-ghost-hover':'var(--cc-theme-hover)',
+      '--color-border':'var(--cc-theme-border)',
+      '--color-border-default':'var(--cc-theme-border)',
+      '--color-border-subtle':'var(--cc-theme-border)',
+    });
     if(node===surface)for(const region of upstream.regions)variables['--code-codex-mask-'+region.key]=String((config.opacity[region.key]??100-config.transparency)/100);
     if(node===controls)Object.assign(variables,{'--cle-paper':'var(--cc-theme-surface)','--cle-paper-raised':'var(--cc-theme-surface)','--cle-subtle':'var(--cc-theme-surface)','--cle-ink':'var(--cc-theme-fg)','--cle-muted':'var(--cc-theme-muted)','--cle-rule':'var(--cc-theme-border)','--cle-rule-strong':'var(--cc-theme-border)','--cle-hover':'var(--cc-theme-hover)','--cle-focus':'var(--cc-theme-accent)'});
     for(const [key,value] of Object.entries(variables)) {
@@ -228,7 +256,7 @@
   function applyContrast(node) {
     if(!node||!theme)return;
     const role=node.getAttribute('data-cc-mac-region');
-    const alpha=role==='composer'?1-config.composerTransparency/100:role==='code'&&config.codeStyle!=='transparent'?1-config.codeTransparency/100:['sidebar','main','bubble','frame'].includes(role)?0:theme.alpha;
+    const alpha=role==='composer'?1-config.composerTransparency/100:role==='code'&&config.codeStyle!=='transparent'?1-config.codeTransparency/100:['sidebar','main','bubble','frame','settings','settings-panel','settings-row'].includes(role)?0:theme.alpha;
     const rgb=contrast.composite(backdropRGB(node),resolvedTone==='light'?[245,248,252]:[18,23,32],alpha);
     const palette=contrast.palette(rgb,inkTones.get(node));inkTones.set(node,palette.tone);
     const lease=themeLeases.get(node);if(!lease)return;
@@ -427,7 +455,7 @@
   },abort.signal);
   function diagnostics() {
     const rect=surface?.getBoundingClientRect();
-    const report={version:'1.0.0-rc.3',upstream:catalog.commit,effect:config.effect,enabled:config.enabled,paused:config.paused||settings().paused,visibility:document.visibilityState,reduceMotion:reduced.matches,frameCallbacks:frameRuntime?.frameCount,performance:policy,resolvedTone,contrastSamples,contrastGrid:[32,18],frameStats:frameRuntime?.stats,overlayPaints,regions:JSON.parse(background.dataset.regions||'{}'),scope:surface?{tag:surface.tagName,id:surface.id,width:rect.width,height:rect.height}:null,canvas:canvas?{width:canvas.width,height:canvas.height,cssWidth:canvas.clientWidth,cssHeight:canvas.clientHeight,dpr:devicePixelRatio}:null,blur:config.blur,transparency:config.transparency,opacity:config.opacity,backgroundOpacity:config.backgroundOpacity,composerTransparency:config.composerTransparency,codeStyle:config.codeStyle,codeTransparency:config.codeTransparency};
+    const report={version:'1.0.0-rc.4',upstream:catalog.commit,effect:config.effect,enabled:config.enabled,paused:config.paused||settings().paused,visibility:document.visibilityState,reduceMotion:reduced.matches,frameCallbacks:frameRuntime?.frameCount,performance:policy,resolvedTone,contrastSamples,contrastGrid:[32,18],frameStats:frameRuntime?.stats,overlayPaints,regions:JSON.parse(background.dataset.regions||'{}'),scope:surface?{tag:surface.tagName,id:surface.id,width:rect.width,height:rect.height}:null,canvas:canvas?{width:canvas.width,height:canvas.height,cssWidth:canvas.clientWidth,cssHeight:canvas.clientHeight,dpr:devicePixelRatio}:null,blur:config.blur,transparency:config.transparency,opacity:config.opacity,backgroundOpacity:config.backgroundOpacity,composerTransparency:config.composerTransparency,codeStyle:config.codeStyle,codeTransparency:config.codeTransparency};
     if(!navigator.clipboard?.writeText){status('当前应用未提供剪贴板接口');return;}
     void navigator.clipboard.writeText(JSON.stringify(report,null,2)).then(()=>status('诊断已复制（不含聊天内容）')).catch(()=>status('复制失败，请检查剪贴板权限'));
   }
@@ -439,7 +467,7 @@
   const mainSelector='main:is(.main-surface,[data-app-shell-main-surface="default"])';
   const structuralSelector=mainSelector+', [data-app-shell-frame],[data-app-shell-active-page],aside.app-shell-left-panel,.sidebar-navigation,[data-app-shell-titlebar],[data-app-shell-page-header],[data-composer-layout],[data-composer-surface-variant]';
   const panelSelector='.bg-surface,.bg-surface-secondary,.bg-surface-tertiary,.bg-token-main-surface-primary,.bg-token-bg-primary,.bg-token-bg-secondary,.bg-background-surface,.bg-background-surface-under,.bg-background-elevated-primary,.bg-background-elevated-secondary,[class*="PanelSurface"],[class*="CardSurface"]';
-  const regionSelector=codeSelector+', '+structuralSelector+', [data-message-role],[data-message-id],[class*="MessageBubble"],.message,'+panelSelector;
+  const regionSelector=codeSelector+', '+structuralSelector+', [data-message-role],[data-message-id],[class*="MessageBubble"],.message,'+panelSelector+', '+settingsRootSelector+', '+settingsPanelSelector+', '+settingsRowSelector;
   const overlaySelector='[role="dialog"],[role="menu"],[role="listbox"],[role="tooltip"],[data-composer-overlay-floating-ui]';
   const relevant=(node,selector)=>node instanceof Element&&(node.matches(selector)||!!node.querySelector(selector));
   const layoutObserver=new MutationObserver(records=>{
@@ -450,7 +478,7 @@
         if(record.attributeName==='style'&&themeStyleSnapshot.get(target)===target.getAttribute('style'))continue;
         if(contentSurface&&target.contains(contentSurface)&&['class','style','hidden','aria-hidden'].includes(record.attributeName))surfaceDirty=true;
         if(record.attributeName==='data-theme'&&target===document.body)applyPresentation();
-        if(target.matches(regionSelector))regionsDirty=true;
+        if(target.matches(regionSelector)||regions.has(target))regionsDirty=true;
         if(target.matches(structuralSelector)){regionsDirty=true;geometryDirty=true;surfaceDirty=true;}
         if(target.matches(overlaySelector)||target.closest(overlaySelector)){overlaysDirty=true;}
         if(['data-app-shell-active-page','hidden','aria-hidden'].includes(record.attributeName)&&relevant(target,mainSelector))surfaceDirty=true;
@@ -466,7 +494,7 @@
     if(surface&&!surface.isConnected)surfaceDirty=true;
     if(surfaceDirty||regionsDirty||geometryDirty||overlaysDirty)scheduleReconcile();
   });
-  layoutObserver.observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:['data-app-shell-active-page','hidden','aria-hidden','class','style','open','data-state','data-theme']});
+  layoutObserver.observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:['data-app-shell-active-page','hidden','aria-hidden','class','style','open','data-state','data-theme','data-density']});
   const resizeObserver=new ResizeObserver(entries=>{if(entries.some(entry=>entry.target===surface))surfaceDirty=true;geometryDirty=true;overlaysDirty=true;scheduleReconcile();});
   function applyRenderPolicy(){
     const bounds=surface?.getBoundingClientRect();
@@ -501,6 +529,9 @@
       const nodes=[...surface.querySelectorAll(selector)];
       for(const node of nodes)if(!nodes.some(parent=>parent!==node&&parent.contains(node)))mark(node,role);
     }
+    for(const node of surface.querySelectorAll(settingsRootSelector))mark(node,'settings');
+    for(const node of surface.querySelectorAll(settingsPanelSelector))if(/var\(\s*--color-background-panel\b/.test(node.style.backgroundColor))mark(node,'settings-panel');
+    for(const node of surface.querySelectorAll(settingsRowSelector))mark(node,'settings-row');
     const codeNodes=[...surface.querySelectorAll(codeSelector)];
     for(const node of codeNodes)if(!codeNodes.some(parent=>parent!==node&&parent.contains(node)))mark(node,'code');
     for(const node of surface.querySelectorAll('[data-message-role],[data-message-id],[class*="MessageBubble"],.message'))mark(node,'bubble');
@@ -568,6 +599,6 @@
   window.addEventListener('scroll',()=>{if(surface){geometryDirty=true;overlaysDirty=true;scheduleReconcile();}},{capture:true,passive:true,signal:abort.signal});
   for(const target of [document,shadow])target.addEventListener('animationend',event=>{if(event.target instanceof Element&&event.target.matches(overlaySelector)){overlaysDirty=true;scheduleReconcile();}},{capture:true,signal:abort.signal});
   function dispose() {if(disposed)return;disposed=true;ui?.close();abort.abort();themeObserver.disconnect();layoutObserver.disconnect();cancelAnimationFrame(reconcileFrame);clearTimeout(reconcileTimer);detachSurface();for(const node of [...themeLeases.keys()])restoreThemeVars(node);frameRuntime?.dispose();style.remove();delete window[API];}
-  window[API]=Object.freeze({version:'1.0.0-rc.3',dispose});
+  window[API]=Object.freeze({version:'1.0.0-rc.4',dispose});
   reconcile();persist();
 })();

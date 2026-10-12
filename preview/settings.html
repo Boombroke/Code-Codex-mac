@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Code-Codex Mac · 设置卡片回归模拟</title>
+  <style>
+    * {box-sizing:border-box}
+    html,body {margin:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif}
+    body {padding:16px;background:#d9dde5;color:#14202b}
+    button,select {font:inherit}
+    button {cursor:pointer;border:1px solid #8994a0;border-radius:8px;padding:7px 12px}
+    .testbar {display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px}
+    .testbar small {margin-left:auto}
+    #fixture-status {margin:0 0 10px;font-size:12px;color:#465462}
+    :root {
+      --theme-variant:light;
+      --color-text:#14202b;
+      --color-text-emphasis:#14202b;
+      --color-text-secondary:#465462;
+      --color-token-text-primary:#14202b;
+      --color-token-text-tertiary:#465462;
+      --color-codex-editor-cursor:#14202b;
+      --color-surface:#ffffff;
+      --color-background-panel:#f1f3f7;
+      --color-background-primary-soft-alpha:rgba(16,24,36,.07);
+      --color-background-primary-soft:#e8edf3;
+      --color-background-primary-ghost-hover:rgba(16,24,36,.12);
+      --color-background-primary-solid:#17202f;
+      --color-text-primary-solid:#ffffff;
+      --color-border:rgba(25,35,50,.18);
+      --color-border-default:rgba(25,35,50,.18);
+      --color-chart-blue:#9639ed;
+      --color-control-thumb-on-accent:#ffffff;
+      --color-codex-icon:#37475e;
+      --color-codex-icon-active:#14202b;
+      caret-color:var(--color-codex-editor-cursor);
+    }
+    :root[data-theme="dark"] {
+      --theme-variant:dark;
+      --color-text:#edf3fb;
+      --color-text-emphasis:#edf3fb;
+      --color-text-secondary:#bac5d1;
+      --color-token-text-primary:#edf3fb;
+      --color-token-text-tertiary:#bac5d1;
+      --color-codex-editor-cursor:#edf3fb;
+      --color-surface:#161b23;
+      /* Intentionally keep the panel pale in both native themes. */
+      --color-background-panel:#f1f3f7;
+      --color-background-primary-soft-alpha:rgba(241,245,249,.08);
+      --color-background-primary-soft:#29303a;
+      --color-background-primary-ghost-hover:rgba(241,245,249,.14);
+      --color-background-primary-solid:#edf2f8;
+      --color-text-primary-solid:#17202f;
+      --color-border:rgba(225,235,249,.22);
+      --color-border-default:rgba(225,235,249,.22);
+      --color-codex-icon:#c6d0df;
+      --color-codex-icon-active:#edf3fb;
+    }
+    #root {height:calc(100vh - 111px);min-height:650px;position:relative;overflow:hidden;border-radius:12px;background:var(--color-surface)}
+    .frame {display:flex;flex-direction:column;height:100%}
+    header {display:flex;align-items:center;gap:16px;height:44px;padding:0 18px;border-bottom:1px solid #9299a033}
+    .workspace {display:flex;flex:1;min-height:0}
+    aside {width:170px;padding:22px 14px;border-right:1px solid #9299a033;color:var(--color-text)}
+    aside p {padding:8px}
+    .active {border:1px solid #9639ed;border-radius:7px}
+    main {flex:1;min-width:0;padding:26px 32px;overflow:auto;background:var(--color-surface);color:var(--color-text)}
+    h1 {font-size:26px;font-weight:550;margin:0 0 28px}
+    h2 {font-size:14px;font-weight:550;margin:0 0 14px}
+    .settings-group {max-width:810px;margin:0 auto}
+    .settings-group section {margin-bottom:28px}
+    .rounded-2xl {border-radius:16px}
+    .overflow-hidden {overflow:hidden}
+    .border {border-width:1px;border-style:solid}
+    .border-default {border-color:var(--color-border)}
+    .setting-row {display:flex;justify-content:space-between;align-items:center;gap:24px;min-height:77px;padding:16px 20px}
+    .setting-row + .setting-row {border-top:1px solid rgba(126,140,160,.14)}
+    .setting-row p {margin:7px 0 0;line-height:1.5}
+    .setting-row strong {font-weight:550}
+    .setting-row button:disabled {opacity:.4;cursor:default}
+    .text-token-text-primary {color:var(--color-token-text-primary)}
+    .text-token-text-tertiary {color:var(--color-token-text-tertiary)}
+    .text-secondary {color:var(--color-text-secondary)}
+    .text-default {color:var(--color-text)}
+    .nav-icon {display:inline-block;width:15px;height:15px;margin-right:8px;vertical-align:-2px;color:var(--color-codex-icon)}
+    .active .nav-icon {color:var(--color-codex-icon-active)}
+    .controls {display:flex;align-items:center;gap:8px;flex-shrink:0}
+    .bg-primary-soft-alpha {background-color:var(--color-background-primary-soft-alpha)}
+    .bg-primary-soft {background-color:var(--color-background-primary-soft)}
+    [class~="hover:bg-primary-ghost-hover"]:hover {background-color:var(--color-background-primary-ghost-hover)}
+    [class~="bg-text/5"] {background-color:color-mix(in srgb,var(--color-text) 5%,transparent)}
+    [class~="bg-text/10"] {background-color:color-mix(in srgb,var(--color-text) 10%,transparent)}
+    [class~="hover:bg-text/10"]:hover {background-color:color-mix(in srgb,var(--color-text) 10%,transparent)}
+    .border-transparent {border-color:transparent}
+    .button-solid {color:var(--color-text-primary-solid);background:var(--color-background-primary-solid);border-color:transparent}
+    select {max-width:170px;padding:7px 10px;border-width:1px;border-style:solid;border-radius:8px;color:var(--color-text)}
+    .switch {width:36px;min-width:36px;height:22px;padding:0;border:none;border-radius:20px;background:transparent;position:relative}
+    .switch-track {display:block;position:relative;width:36px;height:22px;border-radius:20px}
+    .bg-chart-blue {background-color:var(--color-chart-blue)}
+    .switch-thumb {position:absolute;right:3px;top:3px;width:16px;height:16px;border-radius:50%;border:1px solid var(--color-control-thumb-on-accent)}
+    .bg-control-thumb-on-accent {background-color:var(--color-control-thumb-on-accent)}
+    .switch[aria-checked="false"] .switch-thumb {right:17px}
+    .ordinary-node {margin:20px 0;padding:18px;border-radius:8px}
+    .control-sample {margin:22px 0;padding:18px;border:1px dashed rgba(125,140,160,.5);border-radius:10px}
+    .retained-solid {background:#314c7b;color:#ffffff;border-color:#314c7b}
+    .composer {padding:14px;border-radius:14px;border:1px solid #8994a050;margin-top:22px;background:var(--color-surface)}
+    .ProseMirror {min-height:50px;outline:none;white-space:pre-wrap;color:var(--color-token-text-primary);caret-color:var(--color-codex-editor-cursor)}
+    .composer-footer {display:flex;align-items:center;justify-content:space-between;padding-top:10px}
+    dialog {padding:24px;border-radius:15px;border:1px solid #8994a060;max-width:420px;color:var(--color-token-text-primary);background:var(--color-surface)}
+    dialog p {line-height:1.7}
+    @media(max-width:1000px) {.setting-row {gap:12px}.controls {flex-wrap:wrap;justify-content:flex-end}.testbar small {width:100%;margin-left:0}aside {width:140px}main {padding:24px}}
+  </style>
+</head>
+<body>
+  <div class="testbar">
+    <button id="light">亮色主题</button><button id="dark">暗色主题</button>
+    <button id="night">深色背景</button><button id="day">亮色背景</button>
+    <button id="mountain">山峦背景</button><button id="popup">弹窗</button>
+    <button id="add-card">新增卡片</button><button id="reuse-card">改为普通节点</button>
+    <button id="leave-settings">退出设置结构</button><button id="restore">恢复</button>
+    <small>独立回归模拟 · 非 GPT 窗口</small>
+  </div>
+  <p id="fixture-status" role="status">模拟原生设置分组：浅色内联实底、按钮变体及动态节点。</p>
+  <div id="root">
+    <div class="frame" data-app-shell-frame="true">
+      <header data-app-shell-titlebar><span data-app-shell-titlebar-content>Code-Codex Mac</span><span class="text-secondary">设置面板透明度回归模拟</span></header>
+      <div class="workspace">
+        <aside class="app-shell-left-panel"><p class="active"><svg class="nav-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 8h12M8 2v12" fill="none" stroke="currentColor"/></svg>常规</p><p><svg class="nav-icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="5" fill="none" stroke="currentColor"/></svg>外观</p><p>通知</p><p>插件</p><p>存储</p></aside>
+        <main data-app-shell-main-surface="default">
+          <div id="settings-group" class="group/settings settings-group" data-density="default">
+            <h1>常规</h1>
+            <section id="permission-section">
+              <h2>权限</h2>
+              <div id="permission-card" class="rounded-2xl overflow-hidden border border-default" style="background-color:var(--color-background-panel, var(--color-background-primary-soft-alpha))">
+                <div class="@container/settings-row setting-row"><div><strong class="text-token-text-primary">默认权限</strong><p class="text-token-text-tertiary">这个面板保留原生浅色实底样式，适配后应该让背景透出。</p></div><button class="switch" role="switch" aria-checked="true" data-state="checked" aria-label="默认权限"><span class="switch-track bg-chart-blue"><span class="switch-thumb bg-control-thumb-on-accent"></span></span></button></div>
+                <div class="@container/settings-row setting-row"><div><strong class="text-token-text-primary">完整访问权限</strong><p class="text-token-text-tertiary">紫色开关和白色圆点应该保持状态配色。</p></div><button class="switch" role="switch" aria-checked="true" data-state="checked" aria-label="完整访问权限"><span class="switch-track bg-chart-blue"><span class="switch-thumb bg-control-thumb-on-accent"></span></span></button></div>
+              </div>
+            </section>
+            <section id="general-section">
+              <h2>常规</h2>
+              <div id="general-card" class="rounded-2xl overflow-hidden border border-default" style="background-color:var(--color-background-panel, var(--color-background-primary-soft-alpha))">
+                <div class="@container/settings-row setting-row"><div><strong class="text-token-text-primary">按钮配色</strong><p class="text-token-text-tertiary">分别检查 outline、secondary 和 field 的文字与底色。</p></div><div class="controls"><button id="ghost-button" class="border-default bg-primary-soft-alpha hover:bg-primary-ghost-hover border text-default">选择</button><button id="soft-button" class="text-default bg-text/5 hover:bg-text/10 border-transparent">查看</button><button id="field-button" class="border-default bg-primary-soft text-default">修改</button></div></div>
+                <div class="@container/settings-row setting-row"><div><strong class="text-token-text-primary">默认编辑器</strong><p class="text-token-text-tertiary">下拉框前景和底色应成对适配。</p></div><select id="editor-select" class="border-default bg-primary-soft-alpha hover:bg-primary-ghost-hover border text-default" aria-label="默认编辑器"><option>系统默认编辑器</option><option>本地代码编辑器</option></select></div>
+                <div class="@container/settings-row setting-row"><div><strong class="text-token-text-primary">关闭窗口前确认</strong><p class="text-token-text-tertiary">每个分组行保持原来的边距和布局。</p></div><button class="switch" role="switch" aria-checked="false" data-state="unchecked" aria-label="关闭窗口前确认"><span class="switch-track bg-text/10"><span class="switch-thumb bg-control-thumb-on-accent"></span></span></button></div>
+                <div class="@container/settings-row setting-row"><div><strong class="text-token-text-primary">提示建议</strong><p class="text-token-text-tertiary">文字本身保持完全不透明，避免五向描边。</p></div><button class="text-default bg-text/5 hover:bg-text/10 border-transparent" disabled>已启用</button></div>
+              </div>
+            </section>
+          </div>
+          <div id="outside-settings" class="control-sample"><p class="text-token-text-primary">设置区外的实底控件样本，底色应保留。</p><button id="outside-solid" class="retained-solid text-white" data-variant="solid">独立操作</button></div>
+          <div class="composer" data-composer-layout="default" data-composer-surface-variant="default"><div class="ProseMirror text-token-text-primary" contenteditable="true" role="textbox" aria-label="消息输入框" data-composer-input spellcheck="false"></div><div class="composer-footer"><span class="text-secondary">输入框 75% 透明度 · 字体 100% 不透明</span><button class="retained-solid" id="send">发送示例</button></div></div>
+        </main>
+      </div>
+    </div>
+  </div>
+  <dialog id="dialog" role="dialog"><h2>外观设置</h2><p class="text-token-text-primary">这是独立模拟弹窗。设置卡片的透明化不应改变按钮和开关状态。</p><button id="close">关闭</button></dialog>
+  <script>
+    const key='code-codex-mac-backgrounds:v1';
+    const params=new URLSearchParams(location.search);
+    const effect=params.get('effect')||'blinking-squares';
+    const tone=params.get('theme')||'light';
+    document.documentElement.dataset.theme=tone;
+    localStorage.setItem(key,JSON.stringify({enabled:true,layoutVersion:4,materialVersion:1,clarityVersion:2,effect,transparency:100,backgroundOpacity:100,composerTransparency:75,tone:'auto',performance:'economy',settings:{'blinking-squares':{backgroundColor:params.get('bright')?'#f4ede4':'#121a29',squareColor:'#ffffff',opacity:.12,keyboardInteraction:false,mouseInteraction:false}}}));
+    const byId=id=>document.getElementById(id);
+    const status=message=>byId('fixture-status').textContent=message;
+    byId('light').onclick=()=>document.documentElement.dataset.theme='light';
+    byId('dark').onclick=()=>document.documentElement.dataset.theme='dark';
+    byId('night').onclick=()=>location.href='?theme='+document.documentElement.dataset.theme;
+    byId('day').onclick=()=>location.href='?bright=1&theme='+document.documentElement.dataset.theme;
+    byId('mountain').onclick=()=>location.href='?effect=mountain&theme='+document.documentElement.dataset.theme;
+    byId('popup').onclick=()=>byId('dialog').showModal();
+    byId('close').onclick=()=>byId('dialog').close();
+    let added=0;
+    byId('add-card').onclick=()=>{
+      const section=document.createElement('section');
+      section.id='added-section-'+(++added);
+      const heading=document.createElement('h2');heading.textContent='新增设置分组 '+added;
+      const card=document.createElement('div');card.id='added-card-'+added;card.className='rounded-2xl overflow-hidden border border-default';
+      card.style.backgroundColor='var(--color-background-panel, var(--color-background-primary-soft-alpha))';
+      const row=document.createElement('div');row.className='@container/settings-row setting-row';
+      const label=document.createElement('strong');label.className='text-token-text-primary';label.textContent='动态插入的设置卡片';
+      const button=document.createElement('button');button.className='text-default bg-text/5 hover:bg-text/10 border-transparent';button.textContent='查看';
+      row.append(label,button);card.append(row);section.append(heading,card);byId('settings-group').append(section);
+      status('已新增卡片 '+added+'；节点沿用浅色内联背景，适配器应自动标记并清空底色。');
+    };
+    byId('reuse-card').onclick=()=>{
+      const card=byId('permission-card');
+      card.className='ordinary-node';card.style.backgroundColor='rgb(212, 222, 236)';card.style.color='rgb(28, 42, 60)';
+      card.replaceChildren(document.createTextNode('原卡片节点已改作普通内容：浅蓝实底与深色文字应恢复，旧区域标记应删除。'));
+      status('已复用 permission-card：class=ordinary-node；原样式 background-color=rgb(212, 222, 236)，color=rgb(28, 42, 60)。');
+    };
+    byId('leave-settings').onclick=()=>{byId('settings-group').removeAttribute('data-density');status('设置容器已移除 data-density；专属标记及变量应归还原生。');};
+    byId('restore').onclick=()=>{window.__CCMacBackground__?.dispose();status('适配器已恢复；未复用的卡片应回到原生浅色实底，额外实底按钮仍保留。');};
+    for(const button of document.querySelectorAll('[role="switch"]'))button.onclick=()=>{const checked=button.getAttribute('aria-checked')!=='true';button.setAttribute('aria-checked',String(checked));button.dataset.state=checked?'checked':'unchecked';button.firstElementChild.className='switch-track '+(checked?'bg-chart-blue':'bg-text/10');};
+    byId('send').onclick=()=>{const editor=document.querySelector('.ProseMirror');status('示例输入：'+(editor.textContent||'（空）'));editor.textContent='';};
+  </script>
+  <script src="/payload.js"></script>
+</body>
+</html>
