@@ -120,11 +120,19 @@ private func stopOldHelpers(allowed: Set<String>, incoming: InstalledPackage) th
         guard let url = app.bundleURL, allowed.contains(url.standardizedFileURL.path), let package = try? InstalledPackage.read(url), package.version <= incoming.version else {
             throw ManagerError(message: "发现未确认来源的运行中启动器，请先退出该启动器再更新")
         }
+        let pid = app.processIdentifier
+        // Launch Services termination state can lag, especially in the CLI
+        // installer without an AppKit run loop. Verify actual process exit too.
+        let exited = { app.isTerminated || kill(pid, 0) == -1 && errno == ESRCH }
         _ = app.terminate()
         let deadline = Date().addingTimeInterval(3)
-        while !app.isTerminated && Date() < deadline { Thread.sleep(forTimeInterval: 0.05) }
-        if !app.isTerminated { _ = app.forceTerminate() }
-        guard app.isTerminated else { throw ManagerError(message: "旧启动器尚未退出，旧版本已保留") }
+        while !exited() && Date() < deadline { Thread.sleep(forTimeInterval: 0.05) }
+        if !exited() {
+            _ = app.forceTerminate()
+            let forcedDeadline = Date().addingTimeInterval(3)
+            while !exited() && Date() < forcedDeadline { Thread.sleep(forTimeInterval: 0.05) }
+        }
+        guard exited() else { throw ManagerError(message: "旧启动器尚未退出，旧版本已保留") }
     }
 }
 private func scheduleCleanup(_ copies: [RetiredCopy], source: URL, incoming: InstalledPackage) throws {
