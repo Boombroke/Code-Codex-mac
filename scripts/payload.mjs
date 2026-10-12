@@ -1,5 +1,6 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import vm from 'node:vm';
 import {createHash} from 'node:crypto';
 import {createFrameRuntime} from './frame-runtime.mjs';
 import {createTheme,clearConversationMasks} from './theme-model.mjs';
@@ -28,10 +29,19 @@ export async function payload(root, assetRoot=root) {
   }
   scripts.unshift('window.__CC_MAC_CATALOG__='+JSON.stringify(catalog)+';window.__CC_MAC_THEME__='+createTheme.toString()+';window.__CC_MAC_CLEAR_CONVERSATION_MASKS__='+clearConversationMasks.toString()+';window.__CC_MAC_RENDER_POLICY__='+createRenderPolicy.toString()+';window.__CC_MAC_MATERIALS__='+createMaterials.toString()+';window.__CC_MAC_CONTRAST__='+createContrastModel.toString()+';window.__CC_MAC_CONTROL_CONTRAST__='+createControlContrast.toString()+';');
   scripts.push(`const loaders=new Map([${loaders.join(',')}]);const modules=hostWindow[Symbol.for('code-codex:background-modules:v1')]??(hostWindow[Symbol.for('code-codex:background-modules:v1')]=new Map());hostWindow.__CC_MAC_LOAD_BACKGROUND__=id=>{if(!modules.has(id)){const load=loaders.get(id);if(!load)throw Error('Unknown background');load();}return modules.get(id);};`);
-  const ui=JSON.parse(await fs.readFile(path.join(root,'upstream-ui-provenance.json'),'utf8'));
+  const ui=JSON.parse(await fs.readFile(path.join(assetRoot,'upstream-ui-provenance.json'),'utf8'));
   if(ui.script!=='vendor/upstream-appearance-ui.js'||ui.commit!==catalog.commit)throw Error('UI and rendering sources do not match');
-  const uiBytes=await fs.readFile(path.join(root,ui.script));
+  const uiBytes=await fs.readFile(path.join(assetRoot,ui.script));
   if(uiBytes.length!==ui.size||createHash('sha256').update(uiBytes).digest('hex')!==ui.sha256)throw Error('Appearance UI integrity check failed');
+  // Counts in channel.json alone cannot prove all choices are selectable.
+  // Validate the actual pinned UI and asset catalog before packaging either channel.
+  const context=vm.createContext(Object.create(null),{codeGeneration:{strings:false,wasm:false}});
+  vm.runInContext('var window={};\n'+uiBytes.toString('utf8'),context,{timeout:1000});
+  const menu=context.window?.__CC_MAC_UPSTREAM_UI__;
+  const assetIDs=catalog.effects.map(effect=>effect.id);
+  const uiIDs=Array.isArray(menu?.effects)?Array.from(menu.effects,effect=>effect.id):[];
+  if(new Set(assetIDs).size!==assetIDs.length||new Set(uiIDs).size!==uiIDs.length||assetIDs.length!==uiIDs.length||assetIDs.some(id=>!uiIDs.includes(id)))throw Error('Appearance UI and background catalog do not match');
+  for(const effect of menu.effects)if(typeof effect.card!=='string'||!effect.card.includes('data-appearance-plugin="'+effect.pluginId+'"')||typeof effect.panel!=='string'||!effect.panel.includes('id="cle-'+effect.suffix+'-settings"'))throw Error('Appearance card or settings panel is missing: '+effect.id);
   scripts.push(uiBytes.toString('utf8'),'window.__CC_MAC_APPEARANCE_UI__='+createAppearanceUI.toString()+';');
   scripts.push(await fs.readFile(path.join(root,'controller.js'),'utf8'));
   return `(() => { const boot=()=>{const hostWindow=window;window.__CCMacBackground__?.dispose();const frameRuntime=(${createFrameRuntime.toString()})(hostWindow);hostWindow[Symbol.for('code-codex-mac:frames:v1')]=frameRuntime;\n${scripts.join('\n;\n')}\n}; if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();})();`;
