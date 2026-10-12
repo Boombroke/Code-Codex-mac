@@ -6,12 +6,13 @@ import {createTheme,clearConversationMasks} from './theme-model.mjs';
 import {createAppearanceUI} from './appearance-ui.mjs';
 import {createRenderPolicy} from './render-policy.mjs';
 import {createMaterials} from './material-model.mjs';
-export async function payload(root) {
-  const catalog=JSON.parse(await fs.readFile(path.join(root,'catalog.json'),'utf8'));
+import {createContrastModel} from './contrast-model.mjs';
+export async function payload(root, assetRoot=root) {
+  const catalog=JSON.parse(await fs.readFile(path.join(assetRoot,'catalog.json'),'utf8'));
   const scripts=[],loaders=[];
   for(const effect of catalog.effects) {
     if(!/^vendor\/[a-z-]+\.js$/.test(effect.script))throw Error('Invalid background path');
-    const bytes=await fs.readFile(path.join(root,effect.script));
+    const bytes=await fs.readFile(path.join(assetRoot,effect.script));
     if(bytes.length!==effect.size||createHash('sha256').update(bytes).digest('hex')!==effect.sha256)throw Error('Background integrity check failed: '+effect.id);
     let rendererCode=bytes.toString('utf8');
     if(['cloud-train','mountain','milky-way'].includes(effect.id)){
@@ -24,7 +25,7 @@ export async function payload(root) {
     }
     loaders.push(`[${JSON.stringify(effect.id)},()=>{const requestAnimationFrame=frameRuntime.requestAnimationFrame;const cancelAnimationFrame=frameRuntime.cancelAnimationFrame;const bindings=new Map();const window=new Proxy(hostWindow,{get(target,key){if(key==='devicePixelRatio')return frameRuntime.renderDpr;if(key==='requestAnimationFrame')return requestAnimationFrame;if(key==='cancelAnimationFrame')return cancelAnimationFrame;const value=Reflect.get(target,key,target);if(typeof value!=='function')return value;if(!bindings.has(key))bindings.set(key,value.bind(target));return bindings.get(key);}});\n${rendererCode}\n}]`);
   }
-  scripts.unshift('window.__CC_MAC_CATALOG__='+JSON.stringify(catalog)+';window.__CC_MAC_THEME__='+createTheme.toString()+';window.__CC_MAC_CLEAR_CONVERSATION_MASKS__='+clearConversationMasks.toString()+';window.__CC_MAC_RENDER_POLICY__='+createRenderPolicy.toString()+';window.__CC_MAC_MATERIALS__='+createMaterials.toString()+';');
+  scripts.unshift('window.__CC_MAC_CATALOG__='+JSON.stringify(catalog)+';window.__CC_MAC_THEME__='+createTheme.toString()+';window.__CC_MAC_CLEAR_CONVERSATION_MASKS__='+clearConversationMasks.toString()+';window.__CC_MAC_RENDER_POLICY__='+createRenderPolicy.toString()+';window.__CC_MAC_MATERIALS__='+createMaterials.toString()+';window.__CC_MAC_CONTRAST__='+createContrastModel.toString()+';');
   scripts.push(`const loaders=new Map([${loaders.join(',')}]);const modules=hostWindow[Symbol.for('code-codex:background-modules:v1')]??(hostWindow[Symbol.for('code-codex:background-modules:v1')]=new Map());hostWindow.__CC_MAC_LOAD_BACKGROUND__=id=>{if(!modules.has(id)){const load=loaders.get(id);if(!load)throw Error('Unknown background');load();}return modules.get(id);};`);
   const ui=JSON.parse(await fs.readFile(path.join(root,'upstream-ui-provenance.json'),'utf8'));
   if(ui.script!=='vendor/upstream-appearance-ui.js'||ui.commit!==catalog.commit)throw Error('UI and rendering sources do not match');

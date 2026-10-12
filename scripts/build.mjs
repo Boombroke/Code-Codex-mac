@@ -1,6 +1,6 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import {fileURLToPath,pathToFileURL} from 'node:url';
+import {fileURLToPath} from 'node:url';
 import {execFileSync} from 'node:child_process';
 import {createHash} from 'node:crypto';
 import {payload} from './payload.mjs';
@@ -14,7 +14,7 @@ const dist=path.join(root,localSource?'private/dist':'dist'),app=path.join(dist,
 await fs.rm(app,{recursive:true,force:true});
 await fs.mkdir(path.join(app,'Contents/MacOS'),{recursive:true});
 await fs.mkdir(path.join(app,'Contents/Resources'),{recursive:true});
-const renderer=Buffer.from(localSource?await (await import(pathToFileURL(path.join(path.resolve(localSource),'scripts/payload.mjs')).href)).payload(path.resolve(localSource)):await payload(root));
+const renderer=Buffer.from(await payload(root,localSource?path.resolve(localSource):root));
 await fs.writeFile(path.join(app,'Contents/Resources/renderer.js'),renderer);
 await fs.writeFile(path.join(app,'Contents/Resources/renderer.sha256'),createHash('sha256').update(renderer).digest('hex')+'\n');
 const catalog=JSON.parse(await fs.readFile(path.join(localSource?path.resolve(localSource):root,'catalog.json'),'utf8'));
@@ -28,7 +28,7 @@ await fs.mkdir(plugin,{recursive:true});
 for(const name of ['plugin.json','README.md','VERIFICATION.md','CHANGELOG.md','SECURITY.md','LICENSE','LICENSE_STATUS.md','THIRD_PARTY_NOTICES_EN.md','THIRD_PARTY_NOTICES_ZH_CN.md','THIRD_PARTY_LICENSES.md'])await fs.copyFile(path.join(root,name),path.join(plugin,name));
 for(const folder of ['skills','.agents','assets'])await fs.cp(path.join(root,folder),path.join(plugin,folder),{recursive:true});
 const info=`<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"><plist version="1.0"><dict><key>CFBundleName</key><string>Code-Codex Mac</string><key>CFBundleDisplayName</key><string>Code-Codex Mac</string><key>CFBundleIdentifier</key><string>org.codecodex.mac.manager</string><key>CFBundleExecutable</key><string>Code-Codex Mac</string><key>CFBundlePackageType</key><string>APPL</string><key>CFBundleShortVersionString</key><string>${version}</string><key>CFBundleVersion</key><string>1</string><key>LSMinimumSystemVersion</key><string>13.0</string><key>NSHighResolutionCapable</key><true/><key>NSPrincipalClass</key><string>NSApplication</string></dict></plist>`;
-await fs.writeFile(path.join(app,'Contents/Info.plist'),info.replace(`<key>CFBundleShortVersionString</key><string>${version}</string>`,`<key>CFBundleShortVersionString</key><string>${bundleVersion}</string><key>CodeCodexVersion</key><string>${version}</string>`).replace('<key>CFBundleDisplayName</key><string>Code-Codex Mac</string>','<key>CFBundleDisplayName</key><string>GPT 动态背景</string>').replace('<key>CFBundleVersion</key><string>1</string>','<key>CFBundleVersion</key><string>2</string>').replace('</dict></plist>','<key>CFBundleIconFile</key><string>Manager.icns</string><key>NSAppTransportSecurity</key><dict><key>NSAllowsLocalNetworking</key><true/></dict></dict></plist>'));
+await fs.writeFile(path.join(app,'Contents/Info.plist'),info.replace(`<key>CFBundleShortVersionString</key><string>${version}</string>`,`<key>CFBundleShortVersionString</key><string>${bundleVersion}</string><key>CodeCodexVersion</key><string>${version}</string>`).replace('<key>CFBundleDisplayName</key><string>Code-Codex Mac</string>','<key>CFBundleDisplayName</key><string>GPT 动态背景</string>').replace('<key>CFBundleVersion</key><string>1</string>',`<key>CFBundleVersion</key><string>${Number(/-rc\.(\d+)$/.exec(version)?.[1]||1)}</string>`).replace('</dict></plist>','<key>CFBundleIconFile</key><string>Manager.icns</string><key>NSAppTransportSecurity</key><dict><key>NSAllowsLocalNetworking</key><true/></dict></dict></plist>'));
 const build=path.join(root,'.build');await fs.mkdir(build,{recursive:true});
 const iconTool=path.join(build,'make-icon'),icons=path.join(build,'Manager.iconset');
 execFileSync('/usr/bin/swiftc',['-O',path.join(root,'native/Icon.swift'),'-o',iconTool],{stdio:'inherit'});
