@@ -33,7 +33,7 @@
   config.opacity.composer=100-config.composerTransparency;
   let renderer, canvas, media, mediaURL, mediaFile, disposed=false, mountRevision=0;
   let surface, contentSurface, positionLease, reconcileFrame=0,reconcileTimer,renderFailed=false;
-  let surfaceDirty=true,regionsDirty=true,geometryDirty=true,overlaysDirty=true,backgroundBounds,routeGraceDeadline=0,routeRetry,emptySurfaceDeadline=0;
+  let surfaceDirty=true,regionsDirty=true,geometryDirty=true,overlaysDirty=true,backgroundBounds;
   let lastCounterUpdate=0,policy;
   const regions=new Map();
   const overlays=new Map(),themeLeases=new Map();
@@ -70,8 +70,6 @@
     [data-cc-mac-background-surface][data-cc-mac-active] [class*="WorkspaceContent"]::before {background-color:transparent!important;background-image:none!important}
     [data-cc-mac-background-surface][data-cc-mac-active] [data-cc-mac-region="sidebar"] {background-color:var(--cc-mac-sidebar)!important;background-image:none!important;--color-surface:transparent;--color-surface-secondary:transparent;--color-surface-tertiary:transparent;backdrop-filter:none!important;-webkit-backdrop-filter:none!important}
     [data-cc-mac-background-surface][data-cc-mac-active] [data-cc-mac-region="header"] {background-color:var(--cc-mac-header)!important;background-image:none!important;--color-surface:transparent;--color-surface-secondary:transparent;--color-surface-tertiary:transparent;backdrop-filter:none!important;-webkit-backdrop-filter:none!important}
-    [data-cc-mac-background-surface][data-cc-mac-active] [data-cc-mac-region="composer"] {background-color:var(--cc-mac-composer)!important;background-image:none!important;--color-composer-surface:transparent;--color-surface:transparent;--color-surface-secondary:transparent;--color-surface-tertiary:transparent;backdrop-filter:none!important;-webkit-backdrop-filter:none!important}
-    [data-cc-mac-background-surface][data-cc-mac-active] [data-cc-mac-region="composer"] :is([data-composer-input],[data-composer-body],[data-composer-input-layout],textarea) {background-color:transparent!important;background-image:none!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important}
     [data-cc-mac-background-surface][data-cc-mac-active] :is([data-thread-scroll-footer="true"],[data-above-composer-portal]) [class*="bg-gradient-to-t"] {background-image:none!important}
     [data-cc-mac-background-surface][data-cc-mac-active] :is([role="dialog"],[role="menu"],[role="listbox"],[data-composer-overlay-floating-ui]) {--color-surface:var(--cc-mac-native);--color-surface-secondary:var(--cc-mac-native);--color-surface-tertiary:var(--cc-mac-native);background-color:var(--cc-mac-native)!important}
     #cc-mac-background-controls {position:fixed;right:16px;bottom:16px;z-index:2147483000;pointer-events:auto;-webkit-app-region:no-drag}
@@ -83,7 +81,7 @@
       --color-border:var(--cc-theme-border);--color-border-default:var(--cc-theme-border);--color-border-light:var(--cc-theme-border);--color-border-subtle:var(--cc-theme-border);
       color:var(--cc-theme-fg);color-scheme:var(--cc-theme-scheme);text-shadow:var(--cc-theme-shadow);-webkit-text-stroke:var(--cc-theme-stroke);paint-order:stroke fill;
     }
-    [data-cc-mac-background-surface][data-cc-mac-active] :is([data-cc-mac-region="sidebar"],[data-cc-mac-region="header"],[data-cc-mac-region="composer"],[data-cc-mac-region="bubble"],[data-cc-mac-region="panel"]), [data-cc-mac-overlay] {
+    [data-cc-mac-background-surface][data-cc-mac-active] :is([data-cc-mac-region="sidebar"],[data-cc-mac-region="header"],[data-cc-mac-region="bubble"],[data-cc-mac-region="panel"]), [data-cc-mac-overlay] {
       background-color:var(--cc-theme-surface)!important;background-image:none!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important;border-color:var(--cc-theme-border)!important;
       --color-surface:var(--cc-theme-surface);--color-surface-secondary:var(--cc-theme-surface);--color-surface-tertiary:var(--cc-theme-surface);--color-composer-surface:var(--cc-theme-surface);
     }
@@ -106,24 +104,6 @@
       --cc-theme-surface:transparent;--color-surface:transparent;--color-surface-secondary:transparent;--color-surface-tertiary:transparent;--color-surface-canvas:transparent;--color-surface-card:transparent;
     }
   `;
-  // The native project/run-location rail is outside the painted Home body.
-  // Its distinct action-bar token must follow the composer's surface too.
-  style.textContent+=`
-    [data-cc-mac-background-surface][data-cc-mac-active] :is([data-cc-mac-region="composer"],.bg-background-composer-action-bar) {
-      --composer-layout-surface-background:var(--cc-mac-composer-surface)!important;
-      --composer-layout-surface-backdrop-filter:none!important;
-      --composer-layout-surface-shadow:none!important;
-      --color-background-composer-surface:var(--cc-mac-composer-surface)!important;
-      --color-background-composer-action-bar:var(--cc-mac-composer-surface)!important;
-      --color-surface-elevated-secondary:var(--cc-mac-composer-surface)!important;
-    }
-    [data-cc-mac-background-surface][data-cc-mac-active] .bg-background-composer-action-bar {
-      background-color:var(--cc-mac-composer-surface)!important;background-image:none!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important;
-    }
-    [data-cc-mac-background-surface][data-cc-mac-active] [data-cc-mac-region="composer"] :is([class*="ComposerLayoutBody"],[class*="ComposerLayoutReplyContext"],[data-composer-body]) {
-      background-color:var(--cc-mac-composer-surface)!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important;
-    }
-  `;
   style.textContent+=`
     [data-cc-mac-background-surface][data-cc-mac-active] [data-cc-mac-region="code"] {
       background-color:var(--cc-material-code-surface)!important;background-image:none!important;
@@ -137,18 +117,6 @@
       --codeblock-background-color:transparent!important;--color-token-text-code-block-background:transparent!important;
     }
     [data-cc-mac-background-surface][data-cc-mac-active] [data-cc-mac-region="code"] :is(pre,code) {color:var(--cc-theme-fg)}
-    [data-cc-mac-background-surface][data-cc-mac-active] :is([data-cc-mac-region="composer"],.bg-background-composer-action-bar) {
-      background-color:var(--cc-mac-composer-surface)!important;backdrop-filter:var(--cc-material-composer-filter)!important;-webkit-backdrop-filter:var(--cc-material-composer-filter)!important;
-    }
-    [data-cc-mac-background-surface][data-cc-mac-active] [data-cc-mac-region="composer"][data-composer-utility-bar-variant="home"] {
-      background-color:transparent!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important;
-    }
-    [data-cc-mac-background-surface][data-cc-mac-active] [data-cc-mac-region="composer"][data-composer-utility-bar-variant="home"] :is([class*="ComposerLayoutBody"],[data-composer-body]) {
-      background-color:var(--cc-mac-composer-surface)!important;backdrop-filter:var(--cc-material-composer-filter)!important;-webkit-backdrop-filter:var(--cc-material-composer-filter)!important;
-    }
-    [data-cc-mac-background-surface][data-cc-mac-active] [data-cc-mac-region="composer"]:not([data-composer-utility-bar-variant="home"]) :is([class*="ComposerLayoutBody"],[data-composer-body]) {
-      background-color:transparent!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important;
-    }
   `;
   style.textContent+=`
     [data-cc-mac-background-surface][data-cc-mac-active] [data-cc-mac-region], [data-cc-mac-overlay] {
@@ -180,6 +148,8 @@
     [data-cc-mac-background-surface][data-cc-mac-active] [data-cc-mac-region="settings-control"] {color-scheme:var(--cc-theme-scheme)}
     [data-cc-mac-background-surface][data-cc-mac-active] [data-cc-mac-region="settings-control"][class~="bg-text/5"] {background-color:var(--cc-settings-control-surface)!important}
   `;
+  style.textContent+=window.__CC_MAC_SHELL_STYLE__('[data-cc-mac-background-surface][data-cc-mac-active]');
+  style.textContent+=window.__CC_MAC_COMPOSER_STYLE__();
   document.head.append(style);
   const controls=document.createElement('div');
   controls.id='cc-mac-background-controls';
@@ -397,7 +367,7 @@
   },abort.signal);
   function diagnostics() {
     const rect=surface?.getBoundingClientRect();
-    const report={version:'1.0.0-rc.9',upstream:catalog.commit,effect:config.effect,enabled:config.enabled,paused:config.paused||settings().paused,visibility:document.visibilityState,reduceMotion:reduced.matches,frameCallbacks:frameRuntime?.frameCount,performance:policy,resolvedTone,foreground:'fixed-white-outline',backgroundReadback:false,frameStats:frameRuntime?.stats,popupRendering:'css',regions:JSON.parse(background.dataset.regions||'{}'),scope:surface?{tag:surface.tagName,id:surface.id,width:rect.width,height:rect.height}:null,canvas:canvas?{width:canvas.width,height:canvas.height,cssWidth:canvas.clientWidth,cssHeight:canvas.clientHeight,dpr:devicePixelRatio}:null,blur:config.blur,transparency:config.transparency,opacity:config.opacity,backgroundOpacity:config.backgroundOpacity,composerTransparency:config.composerTransparency,codeStyle:config.codeStyle,codeTransparency:config.codeTransparency};
+    const report={version:'1.0.0-rc.10',upstream:catalog.commit,effect:config.effect,enabled:config.enabled,paused:config.paused||settings().paused,visibility:document.visibilityState,reduceMotion:reduced.matches,frameCallbacks:frameRuntime?.frameCount,performance:policy,resolvedTone,foreground:'fixed-white-outline',backgroundReadback:false,frameStats:frameRuntime?.stats,popupRendering:'css',regions:JSON.parse(background.dataset.regions||'{}'),scope:surface?{tag:surface.tagName,id:surface.id,width:rect.width,height:rect.height}:null,canvas:canvas?{width:canvas.width,height:canvas.height,cssWidth:canvas.clientWidth,cssHeight:canvas.clientHeight,dpr:devicePixelRatio}:null,blur:config.blur,transparency:config.transparency,opacity:config.opacity,backgroundOpacity:config.backgroundOpacity,composerTransparency:config.composerTransparency,codeStyle:config.codeStyle,codeTransparency:config.codeTransparency};
     if(!navigator.clipboard?.writeText){status('当前应用未提供剪贴板接口');return;}
     void navigator.clipboard.writeText(JSON.stringify(report,null,2)).then(()=>status('诊断已复制（不含聊天内容）')).catch(()=>status('复制失败，请检查剪贴板权限'));
   }
@@ -422,6 +392,7 @@
         if(record.attributeName==='data-theme'&&target===document.body)applyPresentation();
         if(target.matches(regionSelector)||regions.has(target))regionsDirty=true;
         if(target.matches(structuralSelector)){regionsDirty=true;geometryDirty=true;surfaceDirty=true;}
+        if(config.enabled&&!renderFailed&&target.matches('main,[class*="FullHeightPageSurfaceLayout"],[class*="MainContentSurface"],.messaging-root,.thread-pane'))for(const animation of target.getAnimations())if(['background-color','background-image'].includes(animation.transitionProperty))animation.cancel();
         if(target.matches(overlaySelector)||target.closest(overlaySelector)){overlaysDirty=true;}
         if(['data-app-shell-active-page','hidden','aria-hidden'].includes(record.attributeName)&&relevant(target,mainSelector))surfaceDirty=true;
       }else{
@@ -434,7 +405,14 @@
       }
     }
     if(surface&&!surface.isConnected)surfaceDirty=true;
-    if(surfaceDirty)window.__CCMacPrepaint__?.update({...config,enabled:config.enabled===true&&!renderFailed});
+    if(config.enabled&&!renderFailed&&surface?.isConnected&&background.parentElement!==surface){surface.prepend(background);frameRuntime?.invalidate();}
+    if(surfaceDirty){
+      window.__CCMacPrepaint__?.update({...config,enabled:config.enabled===true&&!renderFailed});
+      if(config.enabled&&!renderFailed&&surface&&!surface.isConnected){
+        const replacement=document.getElementById('root');
+        if(replacement&&replacement!==surface&&replacement.querySelector('[data-app-shell-frame],'+mainSelector+',.messaging-root,.thread-pane')&&background.parentElement!==replacement)replacement.prepend(background);
+      }
+    }
     if(surfaceDirty||regionsDirty||geometryDirty||overlaysDirty)scheduleReconcile();
   });
   layoutObserver.observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:['data-app-shell-active-page','hidden','aria-hidden','class','style','role','open','data-state','data-theme','data-density','data-app-shell-left-panel-appearance','data-user-message-bubble','data-message-role','data-message-id','data-markdown-text-tone','data-thread-title','data-thread-title-trigger','data-thread-secondary-title']});
@@ -519,22 +497,12 @@
   function reconcile() {
     reconcileFrame=0;if(disposed)return;
     let next=surfaceDirty?findSurface():surface;
-    // React can briefly remove the old main or overlap old/new main nodes.
-    // Keep the same validated shell and its renderer during that handoff.
-    if(!next&&surface?.isConnected&&surface.matches('#root,[data-app-shell-frame="true"]')) {
-      const now=performance.now();if(!routeGraceDeadline)routeGraceDeadline=now+600;
-      if(now<routeGraceDeadline){next=surface;if(!routeRetry)routeRetry=setTimeout(()=>{routeRetry=undefined;surfaceDirty=true;scheduleReconcile();},50);}
-    } else {routeGraceDeadline=0;clearTimeout(routeRetry);routeRetry=undefined;}
-    if(!next&&!surface&&config.enabled&&!renderFailed){
-      if(!emptySurfaceDeadline)emptySurfaceDeadline=performance.now()+600;
-      if(performance.now()<emptySurfaceDeadline){if(!routeRetry)routeRetry=setTimeout(()=>{routeRetry=undefined;surfaceDirty=true;scheduleReconcile();},100);}
-      else window.__CCMacPrepaint__?.update({...config,enabled:false});
-    } else if(next)emptySurfaceDeadline=0;
+    // A loading state can outlive an arbitrary grace period. Keep the validated
+    // shell until it is actually removed or hidden; DOM changes wake this code.
+    if(!next&&surface?.isConnected&&surface.matches('#root,[data-app-shell-frame="true"]')&&!surface.closest('[hidden],[aria-hidden="true"],[data-app-shell-active-page="false"],.hidden,.invisible'))next=surface;
     if(next!==surface) {
-      const nextBounds=next?.getBoundingClientRect();
-      const preserveRenderer=!!renderer&&surface?.id==='root'&&next?.id==='root'&&backgroundBounds&&Math.abs(nextBounds.width-backgroundBounds.width)<1&&Math.abs(nextBounds.height-backgroundBounds.height)<1;
+      const preserveRenderer=!!renderer&&surface?.id==='root'&&next?.id==='root';
       detachSurface(preserveRenderer);surface=next;
-      if(!surface)window.__CCMacPrepaint__?.update({...config,enabled:false});
       if(surface) {
         if(getComputedStyle(surface).position==='static') {
           positionLease={value:surface.style.getPropertyValue('position'),priority:surface.style.getPropertyPriority('position')};
@@ -559,7 +527,7 @@
   window.addEventListener('resize',()=>{geometryDirty=true;surfaceDirty=true;overlaysDirty=true;scheduleReconcile();},{signal:abort.signal});
   window.addEventListener('scroll',()=>{if(surface){geometryDirty=true;overlaysDirty=true;scheduleReconcile();}},{capture:true,passive:true,signal:abort.signal});
   for(const target of [document,shadow])target.addEventListener('animationend',event=>{if(event.target instanceof Element&&event.target.matches(overlaySelector)){overlaysDirty=true;scheduleReconcile();}},{capture:true,signal:abort.signal});
-  function dispose() {if(disposed)return;disposed=true;ui?.close();abort.abort();themeObserver.disconnect();layoutObserver.disconnect();cancelAnimationFrame(reconcileFrame);clearTimeout(reconcileTimer);clearTimeout(routeRetry);detachSurface();for(const node of [...themeLeases.keys()])restoreThemeVars(node);frameRuntime?.dispose();style.remove();window.__CCMacPrepaint__?.dispose();delete window[API];}
-  window[API]=Object.freeze({version:'1.0.0-rc.9',dispose});
+  function dispose() {if(disposed)return;disposed=true;ui?.close();abort.abort();themeObserver.disconnect();layoutObserver.disconnect();cancelAnimationFrame(reconcileFrame);clearTimeout(reconcileTimer);detachSurface();for(const node of [...themeLeases.keys()])restoreThemeVars(node);frameRuntime?.dispose();style.remove();window.__CCMacPrepaint__?.dispose();delete window[API];}
+  window[API]=Object.freeze({version:'1.0.0-rc.10',dispose});
   reconcile();persist();
 })();

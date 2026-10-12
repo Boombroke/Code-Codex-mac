@@ -24,6 +24,13 @@ const server=http.createServer(async(req,res)=>{
       if(baseline)html=html.replace('src="/payload.js"','src="/baseline.js"');
       res.setHeader('Content-Type','text/html;charset=utf-8');res.end(html);
     }
+    else if(new URL(req.url,'http://localhost').pathname==='/transition-materials'){
+      const baseline=new URL(req.url,'http://localhost').searchParams.has('baseline');
+      if(baseline&&!baselinePath){res.writeHead(400);res.end('A baseline file is required');return;}
+      let html=await fs.readFile(path.join(root,'preview/transition-materials.html'),'utf8');
+      if(baseline)html=html.replace('src="/payload.js"','src="/baseline.js"');
+      res.setHeader('Content-Type','text/html;charset=utf-8');res.end(html);
+    }
     else if(new URL(req.url,'http://localhost').pathname==='/initial-paint'){
       const baseline=new URL(req.url,'http://localhost').searchParams.has('baseline');
       if(baseline&&!baselinePath){res.writeHead(400,{'Content-Type':'text/plain;charset=utf-8'});res.end('未配置首绘制基线文件，请以 --baseline=<本地文件> 启动预览服务。');return;}
