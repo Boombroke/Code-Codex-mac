@@ -316,7 +316,10 @@ actor DevToolsClient {
                 let executable = try verifyGPT(), code = try checkedScript("renderer"), launchScript = try checkedScript("launch"), port = try reservePort()
                 let child = Process(); child.executableURL = executable; child.arguments = ["--remote-debugging-address=127.0.0.1", "--remote-debugging-port=\(port)"]
                 child.standardOutput = FileHandle.nullDevice; child.standardError = FileHandle.nullDevice
-                child.terminationHandler = { [weak self] _ in Task { @MainActor in await self?.disconnected() } }
+                child.terminationHandler = { [weak self] _ in
+                    guard let manager = self else { return }
+                    Task { @MainActor in await manager.disconnected() }
+                }
                 try child.run(); process = child; activePort = port; activeCode = code; activeLaunchScript = launchScript; applyLaunchPreferences = true
                 status.stringValue = "GPT 已打开，正在启用背景…"; openButton?.isEnabled = true; launching = false
                 session = Task { [weak self] in await self?.monitor(pid: child.processIdentifier, port: port, code: code, launchScript: launchScript) }
@@ -351,9 +354,10 @@ actor DevToolsClient {
                         clients[id] = client; scriptIDs[id] = identifier; status.stringValue = "外观组件已接入。GPT 窗口内可调节背景。\n菜单栏 ✦ 提供设置、恢复和卸载。"
                     } catch {
                         if Task.isCancelled {
+                            let cleanupScriptID = scriptID
                             let restored = await Task.detached {
                                 let cleanup = DevToolsClient(url: url)
-                                if let identifier = scriptID { _ = try? await cleanup.call("Page.removeScriptToEvaluateOnNewDocument", ["identifier": identifier]) }
+                                if let identifier = cleanupScriptID { _ = try? await cleanup.call("Page.removeScriptToEvaluateOnNewDocument", ["identifier": identifier]) }
                                 do { let response = try await cleanup.call("Runtime.evaluate", ["expression": restoreExpression]); await cleanup.close(); return response["exceptionDetails"] == nil }
                                 catch { await cleanup.close(); return false }
                             }.value
