@@ -21,6 +21,8 @@ export function createContrastModel() {
     return {tone:dark?'light':'dark',luminance:l,contrast:ratio(l,luminance(dark?[2,4,6]:[255,255,255])),vars:{
       '--cc-theme-fg':foreground,'--cc-theme-muted':muted,
       '--cc-theme-accent':safeColor(dark?'#003f80':'#c2e2ff'),...syntaxVars,
+      '--cc-settings-control-surface':dark?'rgba(245,248,252,.16)':'rgba(13,19,28,.16)',
+      '--cc-settings-control-hover':dark?'rgba(245,248,252,.24)':'rgba(13,19,28,.24)',
       '--cc-theme-border':dark?'rgba(13,20,27,.28)':'rgba(255,255,255,.3)',
       '--cc-theme-shadow':shadow,
     }};

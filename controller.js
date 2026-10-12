@@ -38,7 +38,7 @@
   const regions=new Map();
   const overlays=new Map(),themeLeases=new Map();
   let theme,resolvedTone='dark';const themeStyleSnapshot=new WeakMap();
-  const contrast=window.__CC_MAC_CONTRAST__(),inkTones=new WeakMap();
+  const contrast=window.__CC_MAC_CONTRAST__(),controlContrast=window.__CC_MAC_CONTROL_CONTRAST__(),inkTones=new WeakMap();
   const sample=document.createElement('canvas');sample.width=32;sample.height=18;
   const sampleContext=sample.getContext('2d',{willReadFrequently:true});
   let samplePixels,lastSample=-Infinity,contrastSamples=0;
@@ -56,6 +56,7 @@
   const settingsRootSelector='[class~="group/settings"][data-density]';
   const settingsPanelSelector=settingsRootSelector+' [style*="--color-background-panel"]';
   const settingsRowSelector=settingsRootSelector+' [class~="@container/settings-row"]';
+  const settingsControlSelector=settingsRowSelector+' :is(button.bg-primary-soft-alpha,button.bg-primary-soft,button[class~="bg-text/5"],[role="switch"],[role="combobox"],select,input[type="text"],input[type="number"])';
   const codeSelector='[data-markdown-copy="code-block"],[class*="CodeBlock_"],.message-code-block,.bg-token-text-code-block-background';
   const style=document.createElement('style');
   style.id='cc-mac-background-style';
@@ -173,6 +174,10 @@
       background-color:var(--cc-theme-fg)!important;border-color:var(--cc-theme-fg)!important;
     }
   `;
+  style.textContent+=`
+    [data-cc-mac-background-surface][data-cc-mac-active] [data-cc-mac-region="settings-control"] {color-scheme:var(--cc-theme-scheme)}
+    [data-cc-mac-background-surface][data-cc-mac-active] [data-cc-mac-region="settings-control"][class~="bg-text/5"] {background-color:var(--cc-settings-control-surface)!important}
+  `;
   document.head.append(style);
   const controls=document.createElement('div');
   controls.id='cc-mac-background-controls';
@@ -227,8 +232,8 @@
     const lease=themeLeases.get(node);
     const material=window.__CC_MAC_MATERIALS__({composerTransparency:config.composerTransparency,codeTransparency:config.codeTransparency,codeStyle:config.codeStyle,tone:resolvedTone,performance:config.performance});
     const variables={...selected.vars,...material.vars};
-    if(['frame','main','sidebar','bubble','settings','settings-panel','settings-row'].includes(node.getAttribute('data-cc-mac-region')))variables['--cc-theme-surface']='transparent';
-    if(['settings','settings-panel','settings-row'].includes(node.getAttribute('data-cc-mac-region')))Object.assign(variables,{
+    if(['frame','main','sidebar','bubble','settings','settings-panel','settings-row','settings-control'].includes(node.getAttribute('data-cc-mac-region')))variables['--cc-theme-surface']='transparent';
+    if(['settings','settings-panel','settings-row','settings-control'].includes(node.getAttribute('data-cc-mac-region')))Object.assign(variables,{
       '--color-background-panel':'transparent',
       '--color-background-primary-soft-alpha':'transparent',
       '--color-background-primary-soft':'var(--cc-theme-hover)',
@@ -236,6 +241,12 @@
       '--color-border':'var(--cc-theme-border)',
       '--color-border-default':'var(--cc-theme-border)',
       '--color-border-subtle':'var(--cc-theme-border)',
+    });
+    if(node.getAttribute('data-cc-mac-region')==='settings-control')Object.assign(variables,{
+      '--color-background-primary-soft-alpha':'var(--cc-settings-control-surface)',
+      '--color-background-primary-soft':'var(--cc-settings-control-surface)',
+      '--color-background-primary-ghost-hover':'var(--cc-settings-control-hover)',
+      '--cc-theme-hover':'var(--cc-settings-control-hover)',
     });
     if(node===surface)for(const region of upstream.regions)variables['--code-codex-mask-'+region.key]=String((config.opacity[region.key]??100-config.transparency)/100);
     if(node===controls)Object.assign(variables,{'--cle-paper':'var(--cc-theme-surface)','--cle-paper-raised':'var(--cc-theme-surface)','--cle-subtle':'var(--cc-theme-surface)','--cle-ink':'var(--cc-theme-fg)','--cle-muted':'var(--cc-theme-muted)','--cle-rule':'var(--cc-theme-border)','--cle-rule-strong':'var(--cc-theme-border)','--cle-hover':'var(--cc-theme-hover)','--cle-focus':'var(--cc-theme-accent)'});
@@ -245,20 +256,22 @@
     }
     themeStyleSnapshot.set(node,node.getAttribute('style'));
   }
-  function backdropRGB(node) {
-    if(!samplePixels||!backgroundBounds)return config.effect==='mountain'?[190,168,145]:[18,25,35];
+  function backdropRGB(node,pixels) {
+    if(!samplePixels||!backgroundBounds){const rgb=config.effect==='mountain'?[190,168,145]:[18,25,35];pixels?.push(rgb);return rgb;}
     const bounds=backgroundBounds,r=node.getBoundingClientRect(),rgb=[0,0,0];let count=0;
     const x0=Math.max(0,Math.floor((r.left-bounds.left)/bounds.width*32)),x1=Math.min(32,Math.ceil((r.right-bounds.left)/bounds.width*32));
     const y0=Math.max(0,Math.floor((r.top-bounds.top)/bounds.height*18)),y1=Math.min(18,Math.ceil((r.bottom-bounds.top)/bounds.height*18));
-    for(let y=y0;y<y1;y++)for(let x=x0;x<x1;x++){const i=(y*32+x)*4;rgb.forEach((_,c)=>rgb[c]+=samplePixels[i+c]);count++;}
+    for(let y=y0;y<y1;y++)for(let x=x0;x<x1;x++){const i=(y*32+x)*4;rgb.forEach((_,c)=>rgb[c]+=samplePixels[i+c]);pixels?.push([samplePixels[i],samplePixels[i+1],samplePixels[i+2]]);count++;}
     return count?rgb.map(v=>v/count):[18,25,35];
   }
   function applyContrast(node) {
     if(!node||!theme)return;
     const role=node.getAttribute('data-cc-mac-region');
-    const alpha=role==='composer'?1-config.composerTransparency/100:role==='code'&&config.codeStyle!=='transparent'?1-config.codeTransparency/100:['sidebar','main','bubble','frame','settings','settings-panel','settings-row'].includes(role)?0:theme.alpha;
-    const rgb=contrast.composite(backdropRGB(node),resolvedTone==='light'?[245,248,252]:[18,23,32],alpha);
+    const alpha=role==='composer'?1-config.composerTransparency/100:role==='code'&&config.codeStyle!=='transparent'?1-config.codeTransparency/100:['sidebar','main','bubble','frame','settings','settings-panel','settings-row','settings-control'].includes(role)?0:theme.alpha;
+    const controlPixels=role==='settings-control'?[]:undefined;
+    const rgb=contrast.composite(backdropRGB(node,controlPixels),resolvedTone==='light'?[245,248,252]:[18,23,32],alpha);
     const palette=contrast.palette(rgb,inkTones.get(node));inkTones.set(node,palette.tone);
+    if(controlPixels){palette.vars['--cc-theme-scheme']=palette.tone;Object.assign(palette.vars,controlContrast.surface(controlPixels.length?controlPixels:[rgb],palette.tone).vars);}
     const lease=themeLeases.get(node);if(!lease)return;
     for(const [key,value]of Object.entries(palette.vars)){
       if(!lease.has(key))lease.set(key,{value:node.style.getPropertyValue(key),priority:node.style.getPropertyPriority(key)});
@@ -467,7 +480,7 @@
   const mainSelector='main:is(.main-surface,[data-app-shell-main-surface="default"])';
   const structuralSelector=mainSelector+', [data-app-shell-frame],[data-app-shell-active-page],aside.app-shell-left-panel,.sidebar-navigation,[data-app-shell-titlebar],[data-app-shell-page-header],[data-composer-layout],[data-composer-surface-variant]';
   const panelSelector='.bg-surface,.bg-surface-secondary,.bg-surface-tertiary,.bg-token-main-surface-primary,.bg-token-bg-primary,.bg-token-bg-secondary,.bg-background-surface,.bg-background-surface-under,.bg-background-elevated-primary,.bg-background-elevated-secondary,[class*="PanelSurface"],[class*="CardSurface"]';
-  const regionSelector=codeSelector+', '+structuralSelector+', [data-message-role],[data-message-id],[class*="MessageBubble"],.message,'+panelSelector+', '+settingsRootSelector+', '+settingsPanelSelector+', '+settingsRowSelector;
+  const regionSelector=codeSelector+', '+structuralSelector+', [data-message-role],[data-message-id],[class*="MessageBubble"],.message,'+panelSelector+', '+settingsRootSelector+', '+settingsPanelSelector+', '+settingsRowSelector+', '+settingsControlSelector;
   const overlaySelector='[role="dialog"],[role="menu"],[role="listbox"],[role="tooltip"],[data-composer-overlay-floating-ui]';
   const relevant=(node,selector)=>node instanceof Element&&(node.matches(selector)||!!node.querySelector(selector));
   const layoutObserver=new MutationObserver(records=>{
@@ -532,6 +545,7 @@
     for(const node of surface.querySelectorAll(settingsRootSelector))mark(node,'settings');
     for(const node of surface.querySelectorAll(settingsPanelSelector))if(/var\(\s*--color-background-panel\b/.test(node.style.backgroundColor))mark(node,'settings-panel');
     for(const node of surface.querySelectorAll(settingsRowSelector))mark(node,'settings-row');
+    for(const node of surface.querySelectorAll(settingsControlSelector))mark(node,'settings-control');
     const codeNodes=[...surface.querySelectorAll(codeSelector)];
     for(const node of codeNodes)if(!codeNodes.some(parent=>parent!==node&&parent.contains(node)))mark(node,'code');
     for(const node of surface.querySelectorAll('[data-message-role],[data-message-id],[class*="MessageBubble"],.message'))mark(node,'bubble');

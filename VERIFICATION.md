@@ -4,7 +4,7 @@
 
 ## 本地已经检查
 
-- 28 项 Node 测试：源资产完整性、独立帧调度、性能像素预算、材质和主题语义、上游设置边界。
+- 35 项 Node 测试：源资产完整性、独立帧调度、性能像素预算、材质和主题语义、上游设置边界。
 - Swift 原生编译通过；严格 code-sign 验证通过，签名类型为 ad-hoc。
 - 安装到隔离临时目录、重复覆盖更新、拒绝覆盖其他应用目录。
 - 原生启动模式和重复点击决策测试；Dock 添加、去重、移除和保留原图标及顺序模型测试。
@@ -15,9 +15,11 @@
 
 ## rc.4 设置页透明修复验证
 
-rc.3 的模拟卡片采用 bg-background-elevated-primary，未复现宿主实际使用的内联 --color-background-panel 底色，不能据此证明实际设置页卡片适配通过。用户的新截图确认了该遗漏。rc.4 静态核对当前官方 bundle 的 group/settings、data-density、@container/settings-row 和分组底色，独立 preview/settings.html 使用这些结构和控件颜色变量，并核验卡片 computed background alpha = 0、控件配色、开关状态、动态新增、节点复用、设置容器退出及恢复。
+rc.3 的模拟卡片采用 bg-background-elevated-primary，未复现宿主实际使用的内联 --color-background-panel 底色，不能据此证明实际设置页卡片适配通过。用户的新截图确认了该遗漏。rc.4 静态核对当前官方 bundle 的 group/settings、data-density、@container/settings-row 和分组底色，独立 preview/settings.html 使用这些结构和控件颜色变量，并核验卡片 computed background alpha = 0、控件局部配色及小面积底色自动增强、控件配色、开关状态、动态新增、节点复用、设置容器退出及恢复。
 
 尚未在正在工作的 GPT 中自动重载本次修复；实际窗口效果须用户完全退出后重新从 Dock 入口启动确认。
+
+控件模型的数学回归覆盖混合黑白、灰阶和彩色采样，最小控件底色及 hover 不降低最差采样对比度；此模型只保护控件采样范围，设置卡片仍保持完全透明，输入框仍为 75% 透明度。
 
 ## rc.3 主题修复验证
 
