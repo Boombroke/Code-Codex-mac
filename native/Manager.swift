@@ -16,24 +16,6 @@ struct ManagerError: LocalizedError {
     var errorDescription: String? { message }
 }
 
-func installPackage(from source: URL, to destination: URL) throws {
-    let fm = FileManager.default
-    guard Bundle(url: source)?.bundleIdentifier == managerID else { throw ManagerError(message: "安装包身份不正确") }
-    if sameLocation(source, destination) { return }
-    if fm.fileExists(atPath: destination.path), Bundle(url: destination)?.bundleIdentifier != managerID {
-        throw ManagerError(message: "安装位置属于其他应用，请先选择其他位置")
-    }
-    try fm.createDirectory(at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
-    let stage = destination.deletingLastPathComponent().appendingPathComponent(".code-codex-install-\(UUID().uuidString).app")
-    let backup = destination.deletingLastPathComponent().appendingPathComponent(".code-codex-previous-\(UUID().uuidString).app")
-    defer { try? fm.removeItem(at: stage) }
-    try fm.copyItem(at: source, to: stage)
-    if fm.fileExists(atPath: destination.path) { try fm.moveItem(at: destination, to: backup) }
-    do { try fm.moveItem(at: stage, to: destination) }
-    catch { if fm.fileExists(atPath: backup.path) { try? fm.moveItem(at: backup, to: destination) }; throw error }
-    if fm.fileExists(atPath: backup.path) { try fm.removeItem(at: backup) }
-}
-
 func command(_ executable: String, _ arguments: [String], timeout: TimeInterval = 20) throws -> String {
     let fm = FileManager.default, task = Process(), done = DispatchSemaphore(value: 0)
     let temporary = fm.temporaryDirectory.appendingPathComponent("code-codex-command-\(UUID().uuidString)")
@@ -65,15 +47,6 @@ func verifiedGPT(_ appURL: URL) throws -> URL {
     _ = try command("/usr/bin/codesign", ["--verify", "--strict", appURL.path])
     _ = try command("/usr/bin/codesign", ["--verify", "-R", "=anchor apple generic and certificate leaf[subject.OU] = \"2DC432GLL2\" and identifier \"com.openai.codex\"", appURL.path])
     return appURL.appendingPathComponent("Contents/MacOS/\(executable)")
-}
-
-func performInstallation(from source: URL) throws -> String {
-    guard !NSRunningApplication.runningApplications(withBundleIdentifier: managerID).contains(where: { $0.processIdentifier != ProcessInfo.processInfo.processIdentifier }) else { throw ManagerError(message: "另一个启动器实例正在运行，请先退出该实例再更新") }
-    _ = try command("/usr/bin/codesign", ["--verify", "--strict", source.path])
-    try installPackage(from: source, to: installedManagerURL)
-    try DockEntry.pin(url: installedManagerURL, official: configuredGPTURL)
-    return "安装完成，Dock 已加入「GPT 动态背景」。\n完成当前任务并完全退出 GPT 后，点一次此图标即可启动。\n窗口内可直接选择背景；菜单栏 ✦ 提供设置和卸载。"
-
 }
 
 func validTarget(_ target: [String: Any], port: Int) -> URL? {
@@ -213,6 +186,7 @@ actor DevToolsClient {
         stack.translatesAutoresizingMaskIntoConstraints = false; root.addSubview(stack)
         NSLayoutConstraint.activate([stack.leadingAnchor.constraint(equalTo: root.leadingAnchor, constant: 28),stack.trailingAnchor.constraint(equalTo: root.trailingAnchor, constant: -28),stack.topAnchor.constraint(equalTo: root.topAnchor, constant: 28),stack.bottomAnchor.constraint(lessThanOrEqualTo: root.bottomAnchor, constant: -24),subtitle.widthAnchor.constraint(equalTo: stack.widthAnchor),note.widthAnchor.constraint(equalTo: stack.widthAnchor),status.widthAnchor.constraint(equalTo: stack.widthAnchor)])
     }
+    func applicationWillTerminate(_ notification: Notification) { resumeUpdateCleanup(includingCurrentParent: true) }
     private func button(_ title: String, _ action: Selector) -> NSButton { let value = NSButton(title: title, target: self, action: action); value.bezelStyle = .rounded; return value }
     private func buildMenu() {
         item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength); item.button?.title = "✦"

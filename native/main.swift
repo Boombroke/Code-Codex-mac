@@ -1,7 +1,10 @@
 import AppKit
 import Foundation
 
-if CommandLine.arguments.contains("--startup-check") {
+if let value = CommandLine.arguments.first(where: { $0.hasPrefix("--finish-update=") }) {
+    do { try finishUpdate(receiptURL: URL(fileURLWithPath: String(value.dropFirst(16)))) }
+    catch { fputs("\(error.localizedDescription)\n", stderr); exit(1) }
+} else if CommandLine.arguments.contains("--startup-check") {
     let mode = startupMode(arguments: CommandLine.arguments, bundle: Bundle.main.bundleURL, installed: installedManagerURL)
     print("{\"startupMode\":\"\(mode.rawValue)\",\"hostLaunched\":false}")
 } else if CommandLine.arguments.contains("--pin-dock") || CommandLine.arguments.contains("--remove-dock") || CommandLine.arguments.contains("--dock-state") {
@@ -41,6 +44,7 @@ if CommandLine.arguments.contains("--startup-check") {
 } else if CommandLine.arguments.contains("--self-test") {
     precondition(buildVersion != "development")
     launchPolicySelfTest()
+    do { try installIdentitySelfTest(); try installationRollbackSelfTest() } catch { fputs("Update self-test failed: \(error)\n", stderr); exit(1) }
     do { try DockEntry.selfTest() } catch { fputs("Dock model self-test failed: \(error)\n", stderr); exit(1) }
     do {
         let output = try command("/usr/bin/printf", ["native-command-ok"])
@@ -69,6 +73,7 @@ if CommandLine.arguments.contains("--startup-check") {
     } catch { fputs("Installation self-test failed: \(error)\n", stderr); exit(1) }
     print("Native startup, duplicate-click, Dock install/removal and target validation passed; no host was launched or connected.")
 } else {
+    resumeUpdateCleanup()
     let app = NSApplication.shared
     app.setActivationPolicy(.regular)
     let delegate = MainActor.assumeIsolated { let value = Manager(); app.delegate = value; return value }
