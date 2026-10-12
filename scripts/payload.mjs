@@ -12,7 +12,8 @@ import {createPrepaint} from './prepaint.mjs';
 import {createShellStyle} from './shell-style.mjs';
 import {createComposerStyle} from './composer-style.mjs';
 import {createHomeMaterial} from './home-material.mjs';
-export async function payload(root, assetRoot=root) {
+import {createSurfacePolicy} from './surface-policy.mjs';
+export async function payload(root, assetRoot=root, {preview=false}={}) {
   const catalog=JSON.parse(await fs.readFile(path.join(assetRoot,'catalog.json'),'utf8'));
   const scripts=[],loaders=[];
   for(const effect of catalog.effects) {
@@ -54,5 +55,5 @@ export async function payload(root, assetRoot=root) {
   for(const effect of menu.effects)if(typeof effect.card!=='string'||!effect.card.includes('data-appearance-plugin="'+effect.pluginId+'"')||typeof effect.panel!=='string'||!effect.panel.includes('id="cle-'+effect.suffix+'-settings"'))throw Error('Appearance card or settings panel is missing: '+effect.id);
   scripts.push(uiBytes.toString('utf8'),'window.__CC_MAC_APPEARANCE_UI__='+createAppearanceUI.toString()+';');
   scripts.push(await fs.readFile(path.join(root,'controller.js'),'utf8'));
-  return `(() => { window.__CCMacBackground__?.dispose();const revision=(window.__CCMacBootRevision__||0)+1;window.__CCMacBootRevision__=revision;window.__CC_MAC_SHELL_STYLE__=${createShellStyle.toString()};window.__CC_MAC_COMPOSER_STYLE__=${createComposerStyle.toString()};window.__CC_MAC_HOME_MATERIAL__=${createHomeMaterial.toString()};const prepaint=(${createPrepaint.toString()})(window,window.__CC_MAC_SHELL_STYLE__,window.__CC_MAC_COMPOSER_STYLE__);const boot=()=>{if(window.__CCMacBootRevision__!==revision)return;const hostWindow=window;const frameRuntime=(${createFrameRuntime.toString()})(hostWindow);hostWindow[Symbol.for('code-codex-mac:frames:v1')]=frameRuntime;\n${scripts.join('\n;\n')}\n}; if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();})();`;
+  return `(() => { const surfacePolicy=(${createSurfacePolicy.toString()})(window,{preview:${JSON.stringify(preview)}});if(!surfacePolicy.allowedWindow()){surfacePolicy.dispose();return;}window.__CCMacBackground__?.dispose();window.__CC_MAC_SURFACE_POLICY__=surfacePolicy;const revision=(window.__CCMacBootRevision__||0)+1;window.__CCMacBootRevision__=revision;window.__CC_MAC_SHELL_STYLE__=${createShellStyle.toString()};window.__CC_MAC_COMPOSER_STYLE__=${createComposerStyle.toString()};window.__CC_MAC_HOME_MATERIAL__=${createHomeMaterial.toString()};const prepaint=(${createPrepaint.toString()})(window,window.__CC_MAC_SHELL_STYLE__,window.__CC_MAC_COMPOSER_STYLE__);const boot=()=>{if(window.__CCMacBootRevision__!==revision)return;if(!surfacePolicy.allowedWindow()){prepaint.dispose();surfacePolicy.dispose();return;}const hostWindow=window;const frameRuntime=(${createFrameRuntime.toString()})(hostWindow);hostWindow[Symbol.for('code-codex-mac:frames:v1')]=frameRuntime;\n${scripts.join('\n;\n')}\n}; if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();})();`;
 }

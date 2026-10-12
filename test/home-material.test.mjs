@@ -19,12 +19,13 @@ class Node {
   setAttribute(key,value){this.attrs.set(key,value);}
   removeAttribute(key){this.attrs.delete(key);}
   matches(selector){
+    if(selector==='[data-cc-mac-validated-surface]')return this.attrs.has('data-cc-mac-validated-surface');
     if(selector.includes('data-composer-utility-bar-variant'))return this.kind==='home'&&this.attrs.get('data-composer-utility-bar-variant')==='home';
     if(selector.includes('data-composer-rail-item'))return this.kind==='item';
     if(selector==='[data-composer-rail]')return this.kind==='rail';
     if(selector.includes('main:is'))return this.kind==='main';
     if(selector==='#root')return this.kind==='app';
-    if(selector==='[data-app-shell-frame]')return this.kind==='frame';
+    if(selector==='[data-app-shell-frame]'||selector==='[data-app-shell-frame="true"]')return this.kind==='frame'&&this.attrs.get('data-app-shell-frame')==='true';
     if(selector.includes('[hidden]'))return this.attrs.has('hidden')||this.attrs.get('aria-hidden')==='true'||this.attrs.get('data-app-shell-active-page')==='false';
     if(selector.startsWith('button,a,'))return this.kind==='popup'||this.kind==='button';
     return false;
@@ -37,13 +38,14 @@ class Node {
 }
 function fixture(){
   const allObservers=[],resizeObservers=[],microtasks=[],listeners=new Map();
-  const document=new Node('document'),app=new Node('app'),frame=new Node('frame'),main=new Node('main'),home=new Node('home',{top:100,right:500,bottom:300,left:200});
+  const document=new Node('document'),app=new Node('app',{top:0,right:1000,bottom:700,left:0}),frame=new Node('frame'),main=new Node('main',{top:40,right:950,bottom:660,left:150}),home=new Node('home',{top:100,right:500,bottom:300,left:200});
+  app.setAttribute('data-cc-mac-validated-surface','');frame.setAttribute('data-app-shell-frame','true');
   home.setAttribute('data-composer-utility-bar-variant','home');document.append(app);app.append(frame);frame.append(main);main.append(home);
   const slot=new Node('slot'),rail=new Node('rail',{top:64,right:508,bottom:124,left:192}),item=new Node('item',{top:64,right:508,bottom:104,left:192});
   home.append(slot);slot.append(rail);rail.append(item);
   const bodyWrapper=new Node('body-wrapper'),body=new Node('body');home.append(bodyWrapper);bodyWrapper.append(body);
   document.addEventListener=(name,fn)=>listeners.set(name,fn);document.removeEventListener=name=>listeners.delete(name);
-  const host={document,queueMicrotask:fn=>microtasks.push(fn),getComputedStyle:node=>({display:node.style.getPropertyValue('display')||'block',visibility:node.style.getPropertyValue('visibility')||'visible',opacity:node.style.getPropertyValue('opacity')||'1'}),addEventListener:(name,fn)=>listeners.set(name,fn),removeEventListener:name=>listeners.delete(name),MutationObserver:class{constructor(fn){this.fn=fn;allObservers.push(this);}observe(){this.connected=true;}disconnect(){this.connected=false;}},ResizeObserver:class{nodes=new Set();constructor(fn){this.fn=fn;resizeObservers.push(this);}observe(node){this.nodes.add(node);}unobserve(node){this.nodes.delete(node);}disconnect(){this.nodes.clear();this.disconnected=true;}}};
+  const host={document,innerWidth:1000,innerHeight:700,queueMicrotask:fn=>microtasks.push(fn),getComputedStyle:node=>({display:node.style.getPropertyValue('display')||'block',visibility:node.style.getPropertyValue('visibility')||'visible',opacity:node.style.getPropertyValue('opacity')||'1'}),addEventListener:(name,fn)=>listeners.set(name,fn),removeEventListener:name=>listeners.delete(name),MutationObserver:class{constructor(fn){this.fn=fn;allObservers.push(this);}observe(){this.connected=true;}disconnect(){this.connected=false;}},ResizeObserver:class{nodes=new Set();constructor(fn){this.fn=fn;resizeObservers.push(this);}observe(node){this.nodes.add(node);}unobserve(node){this.nodes.delete(node);}disconnect(){this.nodes.clear();this.disconnected=true;}}};
   return {host,home,rail,item,slot,body,main,app,frame,document,allObservers,resizeObservers,listeners,flush(){while(microtasks.length)microtasks.shift()();}};
 }
 const insets=node=>Object.fromEntries(['top','right','bottom','left'].map(edge=>[edge,node.style.getPropertyValue('--cc-home-material-'+edge)]));
@@ -106,4 +108,45 @@ test('latest enabled state before native HTML insertion is respected by the seri
   const api=factory(f.host);api.update(true);api.update({enabled:true,removed:true});f.document.append(f.app);api.refresh();
   assert.equal(f.home.getAttribute('data-cc-mac-home-material-owner'),null);
   api.update({enabled:true});assert.equal(f.home.getAttribute('data-cc-mac-home-material-owner'),'');api.dispose();
+});
+
+test('a copied or revoked scope marker cannot paint Home outside the validated main',()=>{
+  const f=fixture(),api=createHomeMaterial(f.host);f.app.removeAttribute('data-cc-mac-validated-surface');api.update(true);
+  assert.equal(f.home.getAttribute('data-cc-mac-home-material-owner'),null);
+  f.app.setAttribute('data-cc-mac-validated-surface','');api.refresh();assert.equal(f.home.getAttribute('data-cc-mac-home-material-owner'),'');
+  f.app.removeAttribute('data-cc-mac-validated-surface');f.allObservers[0].fn([{type:'attributes',attributeName:'data-cc-mac-validated-surface',target:f.app}]);f.flush();
+  assert.equal(f.home.getAttribute('data-cc-mac-home-material-owner'),null);assert.deepEqual(insets(f.home),{top:'',right:'',bottom:'',left:''});api.dispose();
+});
+
+test('offscreen or oversized rails never produce a giant blur plate and restore existing leases',()=>{
+  for(const rect of [{top:-5000,right:508,bottom:124,left:192},{top:64,right:5000,bottom:124,left:192},{top:64,right:780,bottom:124,left:150},{top:42,right:508,bottom:650,left:192}]){
+    const f=fixture(),api=createHomeMaterial(f.host);f.home.setAttribute('data-cc-mac-home-material-owner','prior');f.home.style.setProperty('--cc-home-material-top','2px','important');api.update(true);
+    f.rail.rect=rect;api.refresh();assert.equal(f.home.getAttribute('data-cc-mac-home-material-owner'),'prior');
+    assert.equal(f.home.style.getPropertyValue('--cc-home-material-top'),'2px');assert.equal(f.home.style.getPropertyPriority('--cc-home-material-top'),'important');
+    assert.equal(f.home.style.getPropertyValue('--cc-home-material-right'),'');api.dispose();
+  }
+});
+
+test('extreme, zero and non-finite scale ratios fail closed while normal motion remains allowed',()=>{
+  for(const scale of [.249,4.001,0,Infinity,NaN]){
+    const f=fixture();f.home.offsetWidth=300*scale;f.home.offsetHeight=200;
+    const api=createHomeMaterial(f.host);api.update(true);assert.equal(f.home.getAttribute('data-cc-mac-home-material-owner'),null);api.dispose();
+  }
+  for(const scale of [.25,1,4]){
+    const f=fixture();f.home.offsetWidth=300*scale;f.home.offsetHeight=200*scale;
+    const api=createHomeMaterial(f.host);api.update(true);assert.equal(f.home.getAttribute('data-cc-mac-home-material-owner'),'');api.dispose();
+  }
+});
+
+test('Home root itself must remain within both main and validated app bounds',()=>{
+  for(const rect of [{top:0,right:500,bottom:300,left:200},{top:100,right:1500,bottom:300,left:200},{top:100,right:200,bottom:300,left:500}]){
+    const f=fixture();f.home.rect=rect;const api=createHomeMaterial(f.host);api.update(true);
+    assert.equal(f.home.getAttribute('data-cc-mac-home-material-owner'),null);api.dispose();
+  }
+});
+
+test('a stale validated marker on an oversized viewport surface cannot bypass Home limits',()=>{
+  const f=fixture(),api=createHomeMaterial(f.host);api.update(true);
+  f.app.rect={left:0,top:0,right:2000,bottom:1500};f.main.rect={left:150,top:40,right:1900,bottom:1400};api.refresh();
+  assert.equal(f.home.getAttribute('data-cc-mac-home-material-owner'),null);assert.deepEqual(insets(f.home),{top:'',right:'',bottom:'',left:''});api.dispose();
 });

@@ -8,7 +8,9 @@
 
 这是 **Dock 单击启动器＋应用内外观扩展**。安装后点击 Dock 的「GPT 动态背景」，直接打开带背景的官方 GPT，不再先进入管理器点击启动，也不需要终端。原来的官方 GPT 入口继续保留，采用普通启动。启动器不修改官方应用文件、签名、登录凭据或聊天记录。
 
-当前版本 `1.0.0-rc.11` 为 Dock 启动版候选。原生目标约束与组件校验可自动测试；实际 GPT 接入需用户完成任务、完全退出后亲自启动验收，不能把构建通过当成正式稳定版证明。
+当前版本 `1.0.0-rc.12` 为 Dock 启动版候选。原生目标约束与组件校验可自动测试；实际 GPT 接入需用户完成任务、完全退出后亲自启动验收，不能把构建通过当成正式稳定版证明。
+
+rc.9–rc.11 存在透明辅助窗口被预置底色铺满的严重回归，用户已报告另一块显示器因此被遮挡。rc.12 增加原生路由白名单、脚本入口复核和主外壳验证；独立页面已复现旧错误并验证拒绝接入，但尚未完成实际双显示器验收。发生过该问题时，先保持原 GPT 入口使用；退出 GPT 后从原图标打开可恢复。不要以独立回归或 CI 通过代替双屏验收。
 
 ## 使用
 
@@ -38,7 +40,7 @@
 
 ## 接入边界
 
-当前[官方插件文档](https://developers.openai.com/plugins/build/plugins)与[扩展能力列表](https://developers.openai.com/plugins/build/extensions)支持插件工具及其 UI、设置等功能，没有公开提供本项目所需的全窗口主题注入接口。本地管理器使用只绑定 `127.0.0.1` 的临时 CDP；核验 OpenAI Team ID `2DC432GLL2` 与官方签名，只接受同一进程端点的 `app://-/index.html`。该运行期间其他本机进程可能连接调试端点，结束后普通重启关闭。没有设置远程监听、关闭安全检查或自动重启已有应用。
+当前[官方插件文档](https://developers.openai.com/plugins/build/plugins)与[扩展能力列表](https://developers.openai.com/plugins/build/extensions)支持插件工具及其 UI、设置等功能，没有公开提供本项目所需的全窗口主题注入接口。本地管理器使用只绑定 `127.0.0.1` 的临时 CDP；核验 OpenAI Team ID `2DC432GLL2` 与官方签名，只接受同一进程端点的 `app://-/index.html` 及明确登记的主聊天／设置 initialRoute，拒绝辅助窗口、其他页面和异常 URL。脚本还会在首绘制前核验可见主外壳及其范围；未通过验证的 Root 不绘制背景。该运行期间其他本机进程可能连接调试端点，结束后普通重启关闭。没有设置远程监听、关闭安全检查或自动重启已有应用。
 
 这是独立原生启动器，背景与控制面板由它接入 GPT。配套说明插件为可选的操作指南，原生安装不依赖插件注册或下载；源码中的 plugin.json 与 .agents 目录可供 Codex CLI / 插件目录单独安装。安装说明插件不能自动让原 GPT 图标加载主题。Chat / Work 模式未验证；应用升级后容器结构可能需要适配。
 
@@ -50,7 +52,7 @@ Apple Silicon，macOS 13+，构建需要 Xcode Command Line Tools 和 Node >=22.
 npm test
 npm run build
 
-# 独立主题 / 光标 / 设置卡片回归页面（输出链接可切换 /contrast、/settings、/conversation、/performance、/initial-paint 、/transition-materials 与 /home-material）
+# 独立主题 / 光标 / 设置卡片回归页面（输出链接可切换 /contrast、/settings、/conversation、/performance、/initial-paint 、/transition-materials 、/home-material 与 /surface-scope）
 node scripts/preview.mjs
 ```
 

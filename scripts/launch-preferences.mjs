@@ -1,3 +1,5 @@
+import {createSurfacePolicy} from './surface-policy.mjs';
+
 export function createLaunchPreferences(saved, effectIDs, fallback='black-hole') {
   const previous=saved&&typeof saved==='object'&&!Array.isArray(saved)?saved:{};
   const next={...previous,enabled:true,removed:false,paused:false,layoutVersion:4};
@@ -14,5 +16,5 @@ export function createLaunchPreferences(saved, effectIDs, fallback='black-hole')
 
 export function launchPreferencesScript(effectIDs) {
   if(!effectIDs.includes('black-hole'))throw Error('Missing fallback effect');
-  return `(()=>{const k='code-codex-mac-backgrounds:v1';let saved;try{saved=JSON.parse(localStorage.getItem(k)||'{}')}catch{}const next=(${createLaunchPreferences.toString()})(saved,${JSON.stringify(effectIDs)});localStorage.setItem(k,JSON.stringify(next));})()`;
+  return `(()=>{const policy=(${createSurfacePolicy.toString()})(window,{observe:false});const eligible=policy.allowedWindow();policy.dispose();if(!eligible)return false;const k='code-codex-mac-backgrounds:v1';let saved;try{saved=JSON.parse(localStorage.getItem(k)||'{}')}catch{}const next=(${createLaunchPreferences.toString()})(saved,${JSON.stringify(effectIDs)});localStorage.setItem(k,JSON.stringify(next));return true;})()`;
 }

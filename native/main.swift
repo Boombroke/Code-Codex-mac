@@ -57,8 +57,36 @@ if let value = CommandLine.arguments.first(where: { $0.hasPrefix("--finish-updat
     let good: [String: Any] = ["type": "page", "url": "app://-/index.html", "webSocketDebuggerUrl": "ws://127.0.0.1:34567/devtools/page/ABC-123"]
     precondition(validTarget(good, port: 34567) != nil)
     precondition(validTarget(good, port: 34568) == nil)
+    let acceptedPages = [
+        "app://-/index.html?initialRoute=%2F",
+        "app://-/index.html?initialRoute=%2Flocal%2Fthread-123", "app://-/index.html?initialRoute=%2Fremote%2Ftask_123",
+        "app://-/index.html?initialRoute=%2Fsettings", "app://-/index.html?initialRoute=%2Fsettings%2Fgeneral-settings",
+        "app://-/index.html?initialRoute=%2Fsettings%2Fbrowser-use%2Fsite-settings%2Fexample_com",
+        "app://-/index.html?initialRoute=%2Fsettings%2Fconnections%2Fapps%2Fadd",
+        "app://-/index.html?initialRoute=%2Fsettings%2Fcode-review%2Frepositories%2Frepo-123",
+        "app://-/index.html?initialRoute=%2Fsettings%2Fplugins-settings%2Fplugin-123"
+    ]
+    for page in acceptedPages { var value = good; value["url"] = page; precondition(validTarget(value, port: 34567) != nil, page) }
+    let rejectedPages = [
+        "app://-/index.html?initialRoute=%2Favatar-overlay", "app://-/index.html?initialRoute=%2Fspotlight",
+        "app://-/index.html?initialRoute=%2Fhotkey-window", "app://-/index.html?initialRoute=%2Fscreen-overlay",
+        "app://-/index.html?initialRoute=%2Fglobal-dictation", "app://-/index.html?initialRoute=%2Fdetached-window",
+        "app://-/index.html?initialRoute=%2Fnew", "app://-/index.html?initialRoute=%2Fnew-thread",
+        "app://-/index.html?initialRoute=%2Fthread%2F123", "app://-/index.html?initialRoute=%2Fsettings%2Funknown",
+        "app://-/index.html?initialRoute=%2Flocal%2F123%2Fextra", "app://-/index.html?initialRoute=%2Fsettings%2Fappearance%2Fextra",
+        "app://-/index.html?initialRoute=%2F&initialRoute=%2Favatar-overlay", "app://-/index.html?InitialRoute=%2F",
+        "app://-/index.html?%69nitialRoute=%2F", "app://-/index.html?windowType=primary", "app://-/index.html?initialRoute", "app://-/index.html?initialRoute=",
+        "app://-/index.html?initialRoute=%ZZ", "app://-/index.html?initialRoute=%252Favatar-overlay",
+        "app://-/index.html?initialRoute=%2F%2Flocal%2F123", "app://-/index.html?initialRoute=%2Flocal%2F..",
+        "app://-/index.html?initialRoute=%2Flocal%2F123%3Fview%3Davatar-overlay", "app://-/index.html?initialRoute=%2F%00",
+        "app://-/index.html?initialRoute=%2F+", "app://-/index.html?initialRoute=%2F&", "app://-/index.html?",
+        "app://-/index.html#avatar-overlay", "app://user@-/index.html", "app://-:123/index.html", "app://%2D/index.html",
+        "app://-/detached-window.html", "app://-/index%2Ehtml", "app://-/index.html ", "app://-/index.html\\"
+    ]
+    for page in rejectedPages { var value = good; value["url"] = page; precondition(validTarget(value, port: 34567) == nil, page) }
     var bad = good; bad["url"] = "https://chatgpt.com/"; precondition(validTarget(bad, port: 34567) == nil)
     bad = good; bad["webSocketDebuggerUrl"] = "ws://0.0.0.0:34567/devtools/page/ABC"; precondition(validTarget(bad, port: 34567) == nil)
+    bad = good; bad["webSocketDebuggerUrl"] = "ws://127.0.0.1:34567/devtools/page/ABC?role=utility"; precondition(validTarget(bad, port: 34567) == nil)
     let temporary = FileManager.default.temporaryDirectory.appendingPathComponent("code-codex-install-test-\(UUID().uuidString)")
     defer { try? FileManager.default.removeItem(at: temporary) }
     do {

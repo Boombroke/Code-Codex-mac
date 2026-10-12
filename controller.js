@@ -2,6 +2,7 @@
 (() => {
   'use strict';
   const API = '__CCMacBackground__';
+  if(!window.__CC_MAC_SURFACE_POLICY__?.allowedWindow())return;
   window[API]?.dispose();
   const catalog = window.__CC_MAC_CATALOG__;
   if (!catalog?.effects?.length) throw Error('Background catalog is missing');
@@ -63,93 +64,94 @@
   const style=document.createElement('style');
   style.id='cc-mac-background-style';
   style.textContent=`
-    [data-cc-mac-background-surface] {isolation:isolate!important}
-    [data-cc-mac-background-surface] > #cc-mac-background {position:absolute;inset:0;width:100%;height:100%;z-index:-1;pointer-events:none;overflow:hidden;border-radius:inherit;background:#080911;contain:strict}
+    [data-cc-mac-background-surface][data-cc-mac-validated-surface] {isolation:isolate!important}
+    [data-cc-mac-background-surface][data-cc-mac-validated-surface] > #cc-mac-background {position:absolute;inset:0;width:100%;height:100%;z-index:-1;pointer-events:none;overflow:hidden;border-radius:inherit;background:#080911;contain:strict}
+    #root:not([data-cc-mac-validated-surface]) > #cc-mac-background {display:none!important}
     #cc-mac-background canvas {display:block;width:100%;height:100%}
-    [data-cc-mac-background-surface][data-cc-mac-active] :is([data-cc-mac-region="frame"],[data-cc-mac-region="main"],.thread-scroll-container[data-app-action-timeline-scroll],[data-thread-scroll-footer="true"]) {background-color:transparent!important;background-image:none!important}
-    [data-cc-mac-background-surface][data-cc-mac-active] [class*="WorkspaceContent"]::before {background-color:transparent!important;background-image:none!important}
-    [data-cc-mac-background-surface][data-cc-mac-active] [data-cc-mac-region="sidebar"] {background-color:var(--cc-mac-sidebar)!important;background-image:none!important;--color-surface:transparent;--color-surface-secondary:transparent;--color-surface-tertiary:transparent;backdrop-filter:none!important;-webkit-backdrop-filter:none!important}
-    [data-cc-mac-background-surface][data-cc-mac-active] [data-cc-mac-region="header"] {background-color:var(--cc-mac-header)!important;background-image:none!important;--color-surface:transparent;--color-surface-secondary:transparent;--color-surface-tertiary:transparent;backdrop-filter:none!important;-webkit-backdrop-filter:none!important}
-    [data-cc-mac-background-surface][data-cc-mac-active] :is([data-thread-scroll-footer="true"],[data-above-composer-portal]) [class*="bg-gradient-to-t"] {background-image:none!important}
-    [data-cc-mac-background-surface][data-cc-mac-active] :is([role="dialog"],[role="menu"],[role="listbox"],[data-composer-overlay-floating-ui]) {--color-surface:var(--cc-mac-native);--color-surface-secondary:var(--cc-mac-native);--color-surface-tertiary:var(--cc-mac-native);background-color:var(--cc-mac-native)!important}
+    [data-cc-mac-background-surface][data-cc-mac-validated-surface][data-cc-mac-active] :is([data-cc-mac-region="frame"],[data-cc-mac-region="main"],.thread-scroll-container[data-app-action-timeline-scroll],[data-thread-scroll-footer="true"]) {background-color:transparent!important;background-image:none!important}
+    [data-cc-mac-background-surface][data-cc-mac-validated-surface][data-cc-mac-active] [class*="WorkspaceContent"]::before {background-color:transparent!important;background-image:none!important}
+    [data-cc-mac-background-surface][data-cc-mac-validated-surface][data-cc-mac-active] [data-cc-mac-region="sidebar"] {background-color:var(--cc-mac-sidebar)!important;background-image:none!important;--color-surface:transparent;--color-surface-secondary:transparent;--color-surface-tertiary:transparent;backdrop-filter:none!important;-webkit-backdrop-filter:none!important}
+    [data-cc-mac-background-surface][data-cc-mac-validated-surface][data-cc-mac-active] [data-cc-mac-region="header"] {background-color:var(--cc-mac-header)!important;background-image:none!important;--color-surface:transparent;--color-surface-secondary:transparent;--color-surface-tertiary:transparent;backdrop-filter:none!important;-webkit-backdrop-filter:none!important}
+    [data-cc-mac-background-surface][data-cc-mac-validated-surface][data-cc-mac-active] :is([data-thread-scroll-footer="true"],[data-above-composer-portal]) [class*="bg-gradient-to-t"] {background-image:none!important}
+    [data-cc-mac-background-surface][data-cc-mac-validated-surface][data-cc-mac-active] :is([role="dialog"],[role="menu"],[role="listbox"],[data-composer-overlay-floating-ui]) {--color-surface:var(--cc-mac-native);--color-surface-secondary:var(--cc-mac-native);--color-surface-tertiary:var(--cc-mac-native);background-color:var(--cc-mac-native)!important}
     #cc-mac-background-controls {position:fixed;right:16px;bottom:16px;z-index:2147483000;pointer-events:auto;-webkit-app-region:no-drag}
   `;
   style.textContent+=`
-    [data-cc-mac-background-surface][data-cc-mac-active], [data-cc-mac-overlay] {
+    [data-cc-mac-background-surface][data-cc-mac-validated-surface][data-cc-mac-active], [data-cc-mac-overlay] {
       --color-surface:var(--cc-theme-surface);--color-surface-secondary:var(--cc-theme-surface);--color-surface-tertiary:var(--cc-theme-surface);--color-surface-canvas:var(--cc-theme-surface);--color-surface-card:var(--cc-theme-surface);--color-surface-elevated:var(--cc-theme-surface);--color-surface-elevated-secondary:var(--cc-theme-surface);--color-surface-default:var(--cc-theme-surface);
       --color-text:var(--cc-theme-fg);--color-text-default:var(--cc-theme-fg);--color-text-primary:var(--cc-theme-fg);--color-text-foreground:var(--cc-theme-fg);--color-text-emphasis:var(--cc-theme-fg);--color-text-composer-primary:var(--cc-theme-fg);--color-text-secondary:var(--cc-theme-muted);--color-text-tertiary:var(--cc-theme-muted);--color-text-accent:var(--cc-theme-accent);--color-accent-blue:var(--cc-theme-accent);
       --color-border:var(--cc-theme-border);--color-border-default:var(--cc-theme-border);--color-border-light:var(--cc-theme-border);--color-border-subtle:var(--cc-theme-border);
       color:var(--cc-theme-fg);color-scheme:var(--cc-theme-scheme);text-shadow:var(--cc-theme-shadow);-webkit-text-stroke:var(--cc-theme-stroke);paint-order:stroke fill;
     }
-    [data-cc-mac-background-surface][data-cc-mac-active] :is([data-cc-mac-region="sidebar"],[data-cc-mac-region="header"],[data-cc-mac-region="bubble"],[data-cc-mac-region="panel"]), [data-cc-mac-overlay] {
+    [data-cc-mac-background-surface][data-cc-mac-validated-surface][data-cc-mac-active] :is([data-cc-mac-region="sidebar"],[data-cc-mac-region="header"],[data-cc-mac-region="bubble"],[data-cc-mac-region="panel"]), [data-cc-mac-overlay] {
       background-color:var(--cc-theme-surface)!important;background-image:none!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important;border-color:var(--cc-theme-border)!important;
       --color-surface:var(--cc-theme-surface);--color-surface-secondary:var(--cc-theme-surface);--color-surface-tertiary:var(--cc-theme-surface);--color-composer-surface:var(--cc-theme-surface);
     }
-    [data-cc-mac-background-surface][data-cc-mac-active] :is([role="dialog"],[role="menu"],[role="listbox"],[role="tooltip"],[data-composer-overlay-floating-ui]) {background-color:var(--cc-theme-surface)!important;--color-surface:var(--cc-theme-surface);--color-surface-secondary:var(--cc-theme-surface);--color-surface-tertiary:var(--cc-theme-surface);color:var(--cc-theme-fg)!important}
+    [data-cc-mac-background-surface][data-cc-mac-validated-surface][data-cc-mac-active] :is([role="dialog"],[role="menu"],[role="listbox"],[role="tooltip"],[data-composer-overlay-floating-ui]) {background-color:var(--cc-theme-surface)!important;--color-surface:var(--cc-theme-surface);--color-surface-secondary:var(--cc-theme-surface);--color-surface-tertiary:var(--cc-theme-surface);color:var(--cc-theme-fg)!important}
     [data-cc-mac-overlay] {isolation:isolate!important}
     [data-cc-mac-overlay]::backdrop {background:var(--cc-theme-surface)!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important}
-    [data-cc-mac-background-surface][data-cc-mac-active] :is(a,[data-cc-mac-region="bubble"] a) {color:var(--cc-theme-accent)}
-    [data-cc-mac-background-surface][data-cc-mac-active] button {border-color:var(--cc-theme-border)}
-    [data-cc-mac-background-surface][data-cc-mac-active] button:hover {background-color:var(--cc-theme-hover)}
-    [data-cc-mac-background-surface][data-cc-mac-active] :is([aria-selected="true"],[aria-current="page"],[data-state="active"],.selected) {background-color:var(--cc-theme-hover)!important;color:var(--cc-theme-accent)!important;border-color:var(--cc-theme-border)!important}
+    [data-cc-mac-background-surface][data-cc-mac-validated-surface][data-cc-mac-active] :is(a,[data-cc-mac-region="bubble"] a) {color:var(--cc-theme-accent)}
+    [data-cc-mac-background-surface][data-cc-mac-validated-surface][data-cc-mac-active] button {border-color:var(--cc-theme-border)}
+    [data-cc-mac-background-surface][data-cc-mac-validated-surface][data-cc-mac-active] button:hover {background-color:var(--cc-theme-hover)}
+    [data-cc-mac-background-surface][data-cc-mac-validated-surface][data-cc-mac-active] :is([aria-selected="true"],[aria-current="page"],[data-state="active"],.selected) {background-color:var(--cc-theme-hover)!important;color:var(--cc-theme-accent)!important;border-color:var(--cc-theme-border)!important}
   `;
   // Composer material is independent; retain the original masks for other panes.
   const nativeOpacityCSS=upstream.opacityCSS.replace(/[^{}]*\{[^{}]*--code-codex-mask-composer[^{}]*\}/g,'');
-  style.textContent+=nativeOpacityCSS.replace(/html\[data-code-codex-ui-mask-active\](?:\[data-code-codex-ui-mask-active\])? body /g,'[data-cc-mac-background-surface][data-cc-mac-active][data-cc-mac-opacity-active] ');
+  style.textContent+=nativeOpacityCSS.replace(/html\[data-code-codex-ui-mask-active\](?:\[data-code-codex-ui-mask-active\])? body /g,'[data-cc-mac-background-surface][data-cc-mac-validated-surface][data-cc-mac-active][data-cc-mac-opacity-active] ');
   // Sidebar and conversation never paint a surface tint, even when masks are
   // disabled or an older saved configuration requests an opaque interface.
   style.textContent+=`
-    [data-cc-mac-background-surface][data-cc-mac-active][data-cc-mac-active] :is(nav[data-app-navigation-rail],[data-cc-mac-region="sidebar"],[data-cc-mac-region="main"],[data-cc-mac-region="bubble"],.sidebar-navigation,.thread-scroll-container[data-app-action-timeline-scroll]) {
+    [data-cc-mac-background-surface][data-cc-mac-validated-surface][data-cc-mac-active][data-cc-mac-active] :is(nav[data-app-navigation-rail],[data-cc-mac-region="sidebar"],[data-cc-mac-region="main"],[data-cc-mac-region="bubble"],.sidebar-navigation,.thread-scroll-container[data-app-action-timeline-scroll]) {
       background-color:transparent!important;background-image:none!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important;
       --cc-theme-surface:transparent;--color-surface:transparent;--color-surface-secondary:transparent;--color-surface-tertiary:transparent;--color-surface-canvas:transparent;--color-surface-card:transparent;
     }
   `;
   style.textContent+=`
-    [data-cc-mac-background-surface][data-cc-mac-active] [data-cc-mac-region="code"] {
+    [data-cc-mac-background-surface][data-cc-mac-validated-surface][data-cc-mac-active] [data-cc-mac-region="code"] {
       background-color:var(--cc-material-code-surface)!important;background-image:none!important;
       backdrop-filter:var(--cc-material-code-filter)!important;-webkit-backdrop-filter:var(--cc-material-code-filter)!important;
       border:1px solid var(--cc-material-border)!important;border-radius:16px;
       box-shadow:inset 0 1px 0 var(--cc-material-edge),0 6px 18px rgba(0,0,0,.08);
       --codeblock-background-color:transparent!important;--color-token-text-code-block-background:transparent!important;--smoothing-background-color:transparent!important;
     }
-    [data-cc-mac-background-surface][data-cc-mac-active] [data-cc-mac-region="code"] :is(pre,code,[class*="CodeBlock_"],[class*="CopyButtonContainer"],[class*="CodeCopy_"],.bg-token-text-code-block-background,[data-code-block-header]) {
+    [data-cc-mac-background-surface][data-cc-mac-validated-surface][data-cc-mac-active] [data-cc-mac-region="code"] :is(pre,code,[class*="CodeBlock_"],[class*="CopyButtonContainer"],[class*="CodeCopy_"],.bg-token-text-code-block-background,[data-code-block-header]) {
       background-color:transparent!important;background-image:none!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important;
       --codeblock-background-color:transparent!important;--color-token-text-code-block-background:transparent!important;
     }
-    [data-cc-mac-background-surface][data-cc-mac-active] [data-cc-mac-region="code"] :is(pre,code) {color:var(--cc-theme-fg)}
+    [data-cc-mac-background-surface][data-cc-mac-validated-surface][data-cc-mac-active] [data-cc-mac-region="code"] :is(pre,code) {color:var(--cc-theme-fg)}
   `;
   style.textContent+=`
-    [data-cc-mac-background-surface][data-cc-mac-active] [data-cc-mac-region], [data-cc-mac-overlay] {
+    [data-cc-mac-background-surface][data-cc-mac-validated-surface][data-cc-mac-active] [data-cc-mac-region], [data-cc-mac-overlay] {
       color:var(--cc-theme-fg);text-shadow:var(--cc-theme-shadow);-webkit-text-stroke:var(--cc-theme-stroke);paint-order:stroke fill;
     }
-    [data-cc-mac-background-surface][data-cc-mac-active] :is([data-composer-input],.ProseMirror,textarea,input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"])) {
+    [data-cc-mac-background-surface][data-cc-mac-validated-surface][data-cc-mac-active] :is([data-composer-input],.ProseMirror,textarea,input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"])) {
       caret-color:var(--cc-theme-fg)!important;color:var(--cc-theme-fg);--color-codex-editor-cursor:var(--cc-theme-fg);
     }
-    [data-cc-mac-background-surface][data-cc-mac-active] :is(textarea,input)::placeholder {color:var(--cc-theme-muted);opacity:1}
-    [data-cc-mac-background-surface][data-cc-mac-active] :is([data-variant="solid"],[role="switch"],.bg-background-primary-solid,[aria-disabled="true"],:disabled) {text-shadow:none;-webkit-text-stroke:0}
+    [data-cc-mac-background-surface][data-cc-mac-validated-surface][data-cc-mac-active] :is(textarea,input)::placeholder {color:var(--cc-theme-muted);opacity:1}
+    [data-cc-mac-background-surface][data-cc-mac-validated-surface][data-cc-mac-active] :is([data-variant="solid"],[role="switch"],.bg-background-primary-solid,[aria-disabled="true"],:disabled) {text-shadow:none;-webkit-text-stroke:0}
   `;
   // Settings groups have an inline native panel token, rather than a surface
   // utility class. Clear only their shells; stateful controls keep their colors.
   style.textContent+=`
-    [data-cc-mac-background-surface][data-cc-mac-active] [data-cc-mac-region="settings-panel"] {
+    [data-cc-mac-background-surface][data-cc-mac-validated-surface][data-cc-mac-active] [data-cc-mac-region="settings-panel"] {
       background-color:transparent!important;background-image:none!important;
       backdrop-filter:none!important;-webkit-backdrop-filter:none!important;
       border-color:var(--cc-theme-border)!important;
     }
-    [data-cc-mac-background-surface][data-cc-mac-active] [data-cc-mac-region="settings-row"] :is(button,[role="combobox"]) {text-shadow:none;-webkit-text-stroke:0}
-    [data-cc-mac-background-surface][data-cc-mac-active] [data-cc-mac-region="settings-row"] [role="switch"][aria-checked="false"] > span {
+    [data-cc-mac-background-surface][data-cc-mac-validated-surface][data-cc-mac-active] [data-cc-mac-region="settings-row"] :is(button,[role="combobox"]) {text-shadow:none;-webkit-text-stroke:0}
+    [data-cc-mac-background-surface][data-cc-mac-validated-surface][data-cc-mac-active] [data-cc-mac-region="settings-row"] [role="switch"][aria-checked="false"] > span {
       border:1px solid var(--cc-theme-border);
     }
-    [data-cc-mac-background-surface][data-cc-mac-active] [data-cc-mac-region="settings-row"] [role="switch"][aria-checked="false"] > span > span {
+    [data-cc-mac-background-surface][data-cc-mac-validated-surface][data-cc-mac-active] [data-cc-mac-region="settings-row"] [role="switch"][aria-checked="false"] > span > span {
       background-color:var(--cc-theme-fg)!important;border-color:var(--cc-theme-fg)!important;
     }
   `;
   style.textContent+=`
-    [data-cc-mac-background-surface][data-cc-mac-active] [data-cc-mac-region="settings-control"] {color-scheme:var(--cc-theme-scheme)}
-    [data-cc-mac-background-surface][data-cc-mac-active] [data-cc-mac-region="settings-control"][class~="bg-text/5"] {background-color:var(--cc-settings-control-surface)!important}
+    [data-cc-mac-background-surface][data-cc-mac-validated-surface][data-cc-mac-active] [data-cc-mac-region="settings-control"] {color-scheme:var(--cc-theme-scheme)}
+    [data-cc-mac-background-surface][data-cc-mac-validated-surface][data-cc-mac-active] [data-cc-mac-region="settings-control"][class~="bg-text/5"] {background-color:var(--cc-settings-control-surface)!important}
   `;
-  style.textContent+=window.__CC_MAC_SHELL_STYLE__('[data-cc-mac-background-surface][data-cc-mac-active]');
-  style.textContent+=window.__CC_MAC_COMPOSER_STYLE__();
+  style.textContent+=window.__CC_MAC_SHELL_STYLE__('[data-cc-mac-background-surface][data-cc-mac-validated-surface][data-cc-mac-active]');
+  style.textContent+=window.__CC_MAC_COMPOSER_STYLE__(['[data-cc-mac-background-surface][data-cc-mac-validated-surface][data-cc-mac-active]']);
   document.head.append(style);
   const controls=document.createElement('div');
   controls.id='cc-mac-background-controls';
@@ -367,7 +369,7 @@
   },abort.signal);
   function diagnostics() {
     const rect=surface?.getBoundingClientRect();
-    const report={version:'1.0.0-rc.11',upstream:catalog.commit,effect:config.effect,enabled:config.enabled,paused:config.paused||settings().paused,visibility:document.visibilityState,reduceMotion:reduced.matches,frameCallbacks:frameRuntime?.frameCount,performance:policy,resolvedTone,foreground:'fixed-white-outline',backgroundReadback:false,frameStats:frameRuntime?.stats,popupRendering:'css',regions:JSON.parse(background.dataset.regions||'{}'),scope:surface?{tag:surface.tagName,id:surface.id,width:rect.width,height:rect.height}:null,canvas:canvas?{width:canvas.width,height:canvas.height,cssWidth:canvas.clientWidth,cssHeight:canvas.clientHeight,dpr:devicePixelRatio}:null,blur:config.blur,transparency:config.transparency,opacity:config.opacity,backgroundOpacity:config.backgroundOpacity,composerTransparency:config.composerTransparency,codeStyle:config.codeStyle,codeTransparency:config.codeTransparency};
+    const report={version:'1.0.0-rc.12',upstream:catalog.commit,effect:config.effect,enabled:config.enabled,paused:config.paused||settings().paused,visibility:document.visibilityState,reduceMotion:reduced.matches,frameCallbacks:frameRuntime?.frameCount,performance:policy,resolvedTone,foreground:'fixed-white-outline',backgroundReadback:false,frameStats:frameRuntime?.stats,popupRendering:'css',regions:JSON.parse(background.dataset.regions||'{}'),scope:surface?{tag:surface.tagName,id:surface.id,width:rect.width,height:rect.height}:null,canvas:canvas?{width:canvas.width,height:canvas.height,cssWidth:canvas.clientWidth,cssHeight:canvas.clientHeight,dpr:devicePixelRatio}:null,blur:config.blur,transparency:config.transparency,opacity:config.opacity,backgroundOpacity:config.backgroundOpacity,composerTransparency:config.composerTransparency,codeStyle:config.codeStyle,codeTransparency:config.codeTransparency};
     if(!navigator.clipboard?.writeText){status('当前应用未提供剪贴板接口');return;}
     void navigator.clipboard.writeText(JSON.stringify(report,null,2)).then(()=>status('诊断已复制（不含聊天内容）')).catch(()=>status('复制失败，请检查剪贴板权限'));
   }
@@ -394,7 +396,7 @@
         if(target.matches(structuralSelector)){regionsDirty=true;geometryDirty=true;surfaceDirty=true;}
         if(config.enabled&&!renderFailed&&target.matches('main,[class*="FullHeightPageSurfaceLayout"],[class*="MainContentSurface"],.messaging-root,.thread-pane'))for(const animation of target.getAnimations())if(['background-color','background-image'].includes(animation.transitionProperty))animation.cancel();
         if(target.matches(overlaySelector)||target.closest(overlaySelector)){overlaysDirty=true;}
-        if(['data-app-shell-active-page','hidden','aria-hidden'].includes(record.attributeName)&&relevant(target,mainSelector))surfaceDirty=true;
+        if(['data-app-shell-active-page','data-app-shell-frame','data-app-shell-main-surface','data-cc-mac-validated-surface','hidden','aria-hidden'].includes(record.attributeName)&&relevant(target,mainSelector))surfaceDirty=true;
       }else{
         for(const node of [...record.addedNodes,...record.removedNodes]){
           if(!(node instanceof Element)||node.matches('#cc-mac-background,#cc-mac-background-controls,[data-cc-mac-popup-mirror]'))continue;
@@ -410,12 +412,12 @@
       window.__CCMacPrepaint__?.update({...config,enabled:config.enabled===true&&!renderFailed});
       if(config.enabled&&!renderFailed&&surface&&!surface.isConnected){
         const replacement=document.getElementById('root');
-        if(replacement&&replacement!==surface&&replacement.querySelector('[data-app-shell-frame],'+mainSelector+',.messaging-root,.thread-pane')&&background.parentElement!==replacement)replacement.prepend(background);
+        if(replacement&&replacement!==surface&&window.__CC_MAC_SURFACE_POLICY__?.validateRoot(replacement)&&background.parentElement!==replacement)replacement.prepend(background);
       }
     }
     if(surfaceDirty||regionsDirty||geometryDirty||overlaysDirty)scheduleReconcile();
   });
-  layoutObserver.observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:['data-app-shell-active-page','hidden','aria-hidden','class','style','role','open','data-state','data-theme','data-density','data-app-shell-left-panel-appearance','data-user-message-bubble','data-message-role','data-message-id','data-markdown-text-tone','data-thread-title','data-thread-title-trigger','data-thread-secondary-title']});
+  layoutObserver.observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:['data-app-shell-active-page','data-app-shell-frame','data-app-shell-main-surface','data-cc-mac-validated-surface','hidden','aria-hidden','class','style','role','open','data-state','data-theme','data-density','data-app-shell-left-panel-appearance','data-user-message-bubble','data-message-role','data-message-id','data-markdown-text-tone','data-thread-title','data-thread-title-trigger','data-thread-secondary-title']});
   const resizeObserver=new ResizeObserver(entries=>{if(entries.some(entry=>entry.target===surface))surfaceDirty=true;geometryDirty=true;overlaysDirty=true;scheduleReconcile();});
   function applyRenderPolicy(){
     const bounds=surface?.getBoundingClientRect();
@@ -434,6 +436,8 @@
     });
     contentSurface=matches.length===1?matches[0]:undefined;
     if(!contentSurface)return undefined;
+    const validatedRoot=contentSurface.closest('#root');
+    if(!window.__CC_MAC_SURFACE_POLICY__?.validateRoot(validatedRoot,contentSurface))return undefined;
     const root=contentSurface.closest('#root');
     const frame=contentSurface.closest('[data-app-shell-frame="true"]');
     for(const candidate of [root,frame,contentSurface])if(candidate&&candidate!==document.body&&candidate!==document.documentElement){
@@ -499,7 +503,7 @@
     let next=surfaceDirty?findSurface():surface;
     // A loading state can outlive an arbitrary grace period. Keep the validated
     // shell until it is actually removed or hidden; DOM changes wake this code.
-    if(!next&&surface?.isConnected&&surface.matches('#root,[data-app-shell-frame="true"]')&&!surface.closest('[hidden],[aria-hidden="true"],[data-app-shell-active-page="false"],.hidden,.invisible'))next=surface;
+    if(!next&&surface?.isConnected&&window.__CC_MAC_SURFACE_POLICY__?.base(surface)&&!surface.closest('[hidden],[aria-hidden="true"],[data-app-shell-active-page="false"],.hidden,.invisible'))next=surface;
     if(next!==surface) {
       const preserveRenderer=!!renderer&&surface?.id==='root'&&next?.id==='root';
       detachSurface(preserveRenderer);surface=next;
@@ -528,6 +532,7 @@
   window.addEventListener('scroll',()=>{if(surface){geometryDirty=true;overlaysDirty=true;scheduleReconcile();}},{capture:true,passive:true,signal:abort.signal});
   for(const target of [document,shadow])target.addEventListener('animationend',event=>{if(event.target instanceof Element&&event.target.matches(overlaySelector)){overlaysDirty=true;scheduleReconcile();}},{capture:true,signal:abort.signal});
   function dispose() {if(disposed)return;disposed=true;ui?.close();abort.abort();themeObserver.disconnect();layoutObserver.disconnect();cancelAnimationFrame(reconcileFrame);clearTimeout(reconcileTimer);detachSurface();for(const node of [...themeLeases.keys()])restoreThemeVars(node);frameRuntime?.dispose();style.remove();window.__CCMacPrepaint__?.dispose();delete window[API];}
-  window[API]=Object.freeze({version:'1.0.0-rc.11',dispose});
+  function revokeSurface(root){if(disposed||surface!==root)return;detachSurface();surfaceDirty=regionsDirty=geometryDirty=overlaysDirty=true;scheduleReconcile();}
+  window[API]=Object.freeze({version:'1.0.0-rc.12',dispose,revokeSurface});
   reconcile();persist();
 })();

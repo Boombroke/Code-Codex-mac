@@ -49,11 +49,69 @@ func verifiedGPT(_ appURL: URL) throws -> URL {
     return appURL.appendingPathComponent("Contents/MacOS/\(executable)")
 }
 
+// Packaged window URLs use index.html for both primary and transparent utility
+// windows. The route is part of the contract; "electron" is only a platform.
+func allowedPrimaryRoute(_ route: String) -> Bool {
+    if route == "/" { return true }
+    guard route.utf8.count <= 4096, route.range(of: "^/[A-Za-z0-9_/-]+$", options: .regularExpression) != nil,
+          !route.contains("//"), !route.hasSuffix("/") else { return false }
+    let parts = route.split(separator: "/").map(String.init)
+    if parts.count == 2 && ["local", "remote"].contains(parts[0]) { return true }
+    guard parts.first == "settings" else { return false }
+    if parts.count == 1 { return true }
+    // Verified in app-initial-6350d04672d0.js (26.1007.30912), gWa and its
+    // /settings children. Unregistered route families remain opt-out.
+    let sections: Set<String> = [
+        "general-settings", "notifications", "import", "profile", "security", "account", "age", "agreements",
+        "parental-controls", "trusted-contact", "safety", "time-management", "appearance", "voice", "storage", "pets",
+        "chronicle", "appshots", "git-settings", "connections", "cloud-settings", "codex-cloud", "cloud-environments",
+        "code-review", "local-environments", "worktrees", "agent", "work-settings", "personalization", "keyboard-shortcuts",
+        "codex-micro", "usage", "billing", "analytics", "consumer-view", "usage-code-review", "debug", "browser-use",
+        "extension", "computer-use", "mcp-settings", "hooks-settings", "plugins-settings", "file-type-handlers",
+        "skills-settings", "data-controls", "archived-chats", "ads-controls", "teams", "cloud-computer", "passwords",
+        "open-source-licenses"
+    ]
+    guard sections.contains(parts[1]) else { return false }
+    if parts.count == 2 { return true }
+    switch parts[1] {
+    case "plugins-settings", "cloud-environments": return true // registered wildcard children
+    case "browser-use":
+        if parts[2] == "site-settings" { return true } // registered site-settings/*
+        return parts.count == 3 && ["extensions", "downloads", "history", "contact-info", "passwords"].contains(parts[2])
+    case "computer-use": return parts.count == 3 // messages or :browserFamily
+    case "connections": return parts.count == 3 || parts.count == 4
+    case "code-review": return parts.count == 4 && parts[2] == "repositories"
+    case "local-environments": return parts.count == 3 && parts[2] == "create"
+    case "teams": return parts.count == 3 || parts.count == 4 && parts[3] == "join"
+    default: return false
+    }
+}
+
+func allowedPrimaryPage(_ page: String) -> Bool {
+    guard page.utf8.count <= 8192,
+          page.range(of: "^app://-/index\\.html(?:\\?initialRoute=[^#&]+)?$", options: .regularExpression) != nil,
+          page.range(of: "[\\x00-\\x20\\x7F\\\\]", options: .regularExpression) == nil,
+          page.range(of: "%(?![0-9A-Fa-f]{2})", options: .regularExpression) == nil,
+          let components = URLComponents(string: page), components.scheme == "app", components.host == "-",
+          components.percentEncodedPath == "/index.html", components.user == nil, components.password == nil,
+          components.port == nil, components.fragment == nil else { return false }
+    guard let query = components.percentEncodedQuery else { return true }
+    // The production URL builder adds only initialRoute. Reject duplicate,
+    // case/encoding aliases, utility roles and noncanonical query fields.
+    let fields = query.components(separatedBy: "&")
+    guard fields.count == 1 else { return false }
+    let pair = fields[0].components(separatedBy: "=")
+    guard pair.count == 2, pair[0] == "initialRoute", !pair[1].contains("+"),
+          let route = pair[1].removingPercentEncoding else { return false }
+    return allowedPrimaryRoute(route)
+}
+
 func validTarget(_ target: [String: Any], port: Int) -> URL? {
     guard target["type"] as? String == "page", let page = target["url"] as? String,
-          let pageURL = URL(string: page), pageURL.scheme == "app", pageURL.host == "-", pageURL.path == "/index.html",
+          allowedPrimaryPage(page),
           let socket = target["webSocketDebuggerUrl"] as? String, let url = URL(string: socket),
           url.scheme == "ws", url.host == "127.0.0.1", url.port == port, url.user == nil, url.password == nil,
+          url.query == nil, url.fragment == nil,
           url.path.range(of: "^/devtools/page/[A-Za-z0-9-]+$", options: .regularExpression) != nil else { return nil }
     return url
 }
@@ -318,6 +376,9 @@ actor DevToolsClient {
                         if applyLaunchPreferences {
                             let seeded = try await client.call("Runtime.evaluate", ["expression": launchScript])
                             guard seeded["exceptionDetails"] == nil else { throw ManagerError(message: "无法恢复已保存的背景设置") }
+                            guard let result = seeded["result"] as? [String: Any], result["type"] as? String == "boolean", result["value"] as? Bool == true else {
+                                await client.close(); continue
+                            }
                             applyLaunchPreferences = false
                         }
                         let registration = try await client.call("Page.addScriptToEvaluateOnNewDocument", ["source": code])

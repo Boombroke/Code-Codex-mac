@@ -17,4 +17,6 @@ The public build contains four effects with retained upstream source records. A 
 
 Use menu bar **✦ → 恢复当前窗口外观** or the in-window restore button for temporary removal. **✦ → 卸载 GPT 动态背景…** removes its Dock entry, launcher and companion registration while preserving GPT, other Dock items and chats. Fully exit GPT and open it from the original icon to end debug access. Closing settings leaves the background helper active; quitting it stops new-page injection.
 
+rc.9–rc.11 could tint transparent auxiliary windows and have a reported second-display obstruction. rc.12 filters auxiliary routes in native and document-start code and paints only a validated, viewport-bounded primary shell; Home frosting is also bounded. If a user has hit this regression, keep their recovered ordinary GPT session intact, never relaunch automatically, and distinguish independent isolation tests from physical multi-display acceptance.
+
 This is a release candidate until actual activation is confirmed. Build, self-test and an independent renderer preview do not prove host compatibility. Keep signing and notarization status explicit when discussing public release.

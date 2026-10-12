@@ -2,11 +2,14 @@
 // styled; no pixel readback, recurring timer, visibility hiding, or UI scaling.
 export function createPrepaint(host, shellStyle, composerStyle) {
   const document=host.document,key='code-codex-mac-backgrounds:v1';
+  // Keep ownership tied to this injection. An older pending prepaint must not
+  // dispose the newer policy installed before document readiness.
+  const surfacePolicy=host.__CC_MAC_SURFACE_POLICY__;
   host.__CCMacPrepaint__?.dispose();
   const homeMaterial=host.__CC_MAC_HOME_MATERIAL__?.(host);
   const style=document.createElement('style');style.id='cc-mac-prepaint-style';
   const gate='data-cc-mac-prepaint';
-  const scope='html['+gate+'] #root';
+  const scope='html['+gate+'] #root[data-cc-mac-validated-surface]';
   style.textContent=`
     ${scope} {isolation:isolate!important;background:var(--cc-mac-prepaint-backdrop)!important;--color-surface:transparent;--color-surface-secondary:transparent;--color-surface-tertiary:transparent;--color-surface-canvas:transparent;--color-surface-default:transparent;--color-background-surface:transparent;--color-background-surface-under:transparent;--color-background-elevated-primary:transparent;--color-background-elevated-secondary:transparent}
     ${scope},${scope} :is(.sidebar-navigation nav[role="navigation"],.sidebar-navigation .sidebar-item,[data-user-message-bubble],[class~="group/settings"][data-density]):not([data-cc-mac-region]) {
@@ -35,6 +38,8 @@ export function createPrepaint(host, shellStyle, composerStyle) {
     latestConfig=config;
     active=config?.enabled===true&&!config.removed&&[2,3,4].includes(config.layoutVersion);
     install();
+    surfacePolicy?.refresh();
+    if(disposed)return;
     const percent=Number(config?.composerTransparency),alpha=1-(Number.isFinite(percent)?Math.min(100,Math.max(0,percent)):75)/100;
     // A small CSS fallback covers only the shell before its canvas exists. The
     // actual decorative canvas paints over it; it never hides or delays content.
@@ -58,6 +63,6 @@ export function createPrepaint(host, shellStyle, composerStyle) {
   let saved;try{saved=JSON.parse(host.localStorage.getItem(key)||'{}');}catch{}
   update(saved);
   if(!root){observer=new host.MutationObserver(()=>{install();if(root)update(latestConfig);});observer.observe(document,{childList:true,subtree:true});}
-  const api={update,dispose(){if(disposed)return;disposed=true;observer?.disconnect();homeMaterial?.dispose();style.remove();if(root){if(previousGate===null)root.removeAttribute(gate);else root.setAttribute(gate,previousGate);for(const [name,prior]of leases)if(prior.value)root.style.setProperty(name,prior.value,prior.priority);else root.style.removeProperty(name);}if(host.__CCMacPrepaint__===api)delete host.__CCMacPrepaint__;}};
+  const api={update,dispose(){if(disposed)return;disposed=true;observer?.disconnect();homeMaterial?.dispose();surfacePolicy?.dispose();style.remove();if(root){if(previousGate===null)root.removeAttribute(gate);else root.setAttribute(gate,previousGate);for(const [name,prior]of leases)if(prior.value)root.style.setProperty(name,prior.value,prior.priority);else root.style.removeProperty(name);}if(host.__CCMacPrepaint__===api)delete host.__CCMacPrepaint__;}};
   host.__CCMacPrepaint__=api;return api;
 }

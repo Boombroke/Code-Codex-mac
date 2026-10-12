@@ -3,12 +3,13 @@
 export function createHomeMaterial(host) {
   const document=host.document,owners=new Map(),observed=new Set(),snapshots=new WeakMap(),styleStates=new WeakMap();
   const marker='data-cc-mac-home-material-owner';
+  const validated='data-cc-mac-validated-surface';
   const home='[data-composer-utility-bar-variant="home"]:is([data-composer-surface-variant],[data-composer-layout]):not([data-composer-body]):not([data-composer-input]):not([class*="ComposerLayoutBody"]):not([class*="ComposerLayoutInput"]):not([class*="ComposerLayoutFooter"])';
   const main='main:is(.main-surface,[data-app-shell-main-surface="default"])';
   const rail='[data-composer-rail]',item='[data-composer-rail-item][data-composer-placement="home"]';
   const blocked='button,a,[role="button"],[role="switch"],[role="combobox"],[role="dialog"],[role="menu"],[role="listbox"],[role="tooltip"],[data-composer-overlay-floating-ui]';
   const hidden='[hidden],[aria-hidden="true"],[data-app-shell-active-page="false"]';
-  const relevant=home+','+rail+','+item+','+main+',#root,[data-app-shell-frame]';
+  const relevant=home+','+rail+','+item+','+main+',#root,[data-app-shell-frame],['+validated+']';
   let active=false,disposed=false,queued=false,observer,resizeObserver,generation=0;
   const enqueue=typeof host.queueMicrotask==='function'?host.queueMicrotask.bind(host):callback=>Promise.resolve().then(callback);
   function inlineState(node){
@@ -32,9 +33,10 @@ export function createHomeMaterial(host) {
   }
   function rectangle(node,cache){
     if(cache.has(node))return cache.get(node);
-    const r=node.getBoundingClientRect(),valid=[r.top,r.right,r.bottom,r.left,r.width,r.height].every(Number.isFinite)&&r.width>0&&r.height>0;
+    const r=node.getBoundingClientRect(),valid=[r.top,r.right,r.bottom,r.left,r.width,r.height].every(Number.isFinite)&&r.width>0&&r.height>0&&r.right>r.left&&r.bottom>r.top;
     const result=valid?{top:r.top,right:r.right,bottom:r.bottom,left:r.left}:null;cache.set(node,result);return result;
   }
+  function inside(rect,bounds){return rect&&bounds&&rect.left>=bounds.left-2&&rect.top>=bounds.top-2&&rect.right<=bounds.right+2&&rect.bottom<=bounds.bottom+2;}
   function setInsets(node,insets){
     if(!owners.has(node))owners.set(node,{attribute:node.getAttribute(marker),styles:new Map()});
     const prior=owners.get(node);
@@ -51,24 +53,35 @@ export function createHomeMaterial(host) {
     if(!active||disposed)return;
     const wanted=new Set(),watch=new Set(),cache=new Map();
     for(const root of document.querySelectorAll(home)){
-      const app=root.closest('#root');
-      if(!app||root===app||!root.closest('[data-app-shell-frame]')||!app.querySelector(main)||root.parentElement?.closest(home)||root.closest(blocked))continue;
+      const app=root.closest('#root'),surface=root.closest('['+validated+']'),mainSurface=root.closest(main);
+      if(!app||surface!==app||root===app||!root.closest('[data-app-shell-frame="true"]')||!mainSurface||!app.contains(mainSurface)||root.parentElement?.closest(home)||root.closest(blocked))continue;
       const rails=[...root.querySelectorAll(rail)].filter(node=>!node.closest(blocked));
       // Do not claim an unknown Home layout that has no native action rail.
       if(!rails.length)continue;
       watch.add(root);for(const node of rails)watch.add(node);
-      if(!visible(root,app))continue;
-      const bounds=rectangle(root,cache);if(!bounds)continue;
-      const union={...bounds};
+      if(!visible(root,app)||!visible(mainSurface,app))continue;
+      const bounds=rectangle(root,cache),appBounds=rectangle(app,cache),mainBounds=rectangle(mainSurface,cache);
+      if(!inside(bounds,appBounds)||!inside(bounds,mainBounds)||!inside(mainBounds,appBounds))continue;
+      const viewport={left:0,top:0,right:host.innerWidth,bottom:host.innerHeight};
+      if(![viewport.right,viewport.bottom].every(value=>Number.isFinite(value)&&value>0)||!inside(appBounds,viewport)||!inside(mainBounds,viewport))continue;
+      const width=bounds.right-bounds.left,height=bounds.bottom-bounds.top;
+      const sx=root.offsetWidth===undefined?1:root.offsetWidth/width,sy=root.offsetHeight===undefined?1:root.offsetHeight/height;
+      if(![sx,sy].every(value=>Number.isFinite(value)&&value>=.25&&value<=4))continue;
+      const union={...bounds};let invalidGeometry=false;
       for(const node of rails){
-        if(!visible(node,root)||![...node.querySelectorAll(item)].some(child=>visible(child,root)&&rectangle(child,cache)))continue;
+        if(!visible(node,root))continue;
+        const present=[...node.querySelectorAll(item)].filter(child=>visible(child,root));
+        if(!present.length)continue;
+        if(present.some(child=>!inside(rectangle(child,cache),mainBounds)||!inside(rectangle(child,cache),appBounds))){invalidGeometry=true;break;}
         const r=rectangle(node,cache);if(!r)continue;
+        if(!inside(r,appBounds)||!inside(r,mainBounds)){invalidGeometry=true;break;}
         union.top=Math.min(union.top,r.top);union.right=Math.max(union.right,r.right);union.bottom=Math.max(union.bottom,r.bottom);union.left=Math.min(union.left,r.left);
       }
       // Motion can scale a Home root or its ancestor. Rectangles are rendered
       // coordinates, while pseudo-element insets use the root's CSS units.
-      const sx=root.offsetWidth>0?root.offsetWidth/(bounds.right-bounds.left):1,sy=root.offsetHeight>0?root.offsetHeight/(bounds.bottom-bounds.top):1;
-      wanted.add(root);setInsets(root,{top:(union.top-bounds.top)*sy,right:(bounds.right-union.right)*sx,bottom:(bounds.bottom-union.bottom)*sy,left:(union.left-bounds.left)*sx});
+      const insets={top:(union.top-bounds.top)*sy,right:(bounds.right-union.right)*sx,bottom:(bounds.bottom-union.bottom)*sy,left:(union.left-bounds.left)*sx},limit=Math.max(256,height*sy);
+      if(invalidGeometry||!inside(union,mainBounds)||!inside(union,appBounds)||union.right-union.left>1.5*width||Object.values(insets).some(value=>!Number.isFinite(value)||-value>limit))continue;
+      wanted.add(root);setInsets(root,insets);
     }
     for(const node of [...owners.keys()])if(!wanted.has(node))restore(node);
     if(resizeObserver){
@@ -102,7 +115,7 @@ export function createHomeMaterial(host) {
         }
       }
     });
-    observer.observe(document,{childList:true,subtree:true,attributes:true,attributeFilter:['class','style','hidden','aria-hidden','data-app-shell-active-page','data-composer-utility-bar-variant','data-composer-layout','data-composer-surface-variant','data-composer-rail','data-composer-rail-placement','data-composer-rail-item','data-composer-placement','data-composer-rail-contained','data-composer-rail-overlap','data-composer-rail-framed']});
+    observer.observe(document,{childList:true,subtree:true,attributes:true,attributeFilter:['class','style','hidden','aria-hidden',validated,'data-app-shell-active-page','data-composer-utility-bar-variant','data-composer-layout','data-composer-surface-variant','data-composer-rail','data-composer-rail-placement','data-composer-rail-item','data-composer-placement','data-composer-rail-contained','data-composer-rail-overlap','data-composer-rail-framed']});
     if(typeof host.ResizeObserver==='function')resizeObserver=new host.ResizeObserver(schedule);
     host.addEventListener?.('resize',schedule);
     document.addEventListener?.('transitionend',settled,true);document.addEventListener?.('animationend',settled,true);
