@@ -52,7 +52,7 @@ npm run build
 node scripts/preview.mjs
 ```
 
-输出 `dist/Code-Codex Mac.app`、ZIP 和 SHA256SUMS。可设置 `CODE_CODEX_SIGN_IDENTITY` 用 Developer ID 签名；公开面向普通用户发布还需要 Apple notarization。目前本地候选仅 ad-hoc 签名，未做 notarization，不应宣称通过 Gatekeeper 的公开发行版。
+交付 ZIP 和 SHA256SUMS 输出到 `dist/`，解压 ZIP 后即可安装。构建中的 `.app` 放在 `.build/artifacts.noindex/public/`，避免应用搜索再次出现同名构建副本。可设置 `CODE_CODEX_SIGN_IDENTITY` 用 Developer ID 签名；公开面向普通用户发布还需要 Apple notarization。目前本地候选仅 ad-hoc 签名，未做 notarization，不应宣称通过 Gatekeeper 的公开发行版。
 
 构建会运行原生启动决策、重复点击、Dock 添加与移除模型、安装/更新目标约束和本机模拟 WebSocket 测试，不会修改测试机器的 Dock，也不会启动、关闭或连接正在运行的 GPT。验证边界及稳定版发布条件见 [VERIFICATION.md](VERIFICATION.md)。
 

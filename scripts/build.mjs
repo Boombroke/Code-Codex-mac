@@ -10,7 +10,10 @@ const version=JSON.parse(await fs.readFile(path.join(root,'package.json'),'utf8'
 const bundleVersion=/^(\d+\.\d+\.\d+)(?:-[0-9A-Za-z.-]+)?$/.exec(version)?.[1];
 if(!bundleVersion)throw Error('Invalid release version');
 const localSource=process.argv.find(arg=>arg.startsWith('--runtime-source='))?.slice(17);
-const dist=path.join(root,localSource?'private/dist':'dist'),app=path.join(dist,'Code-Codex Mac.app');
+const dist=path.join(root,localSource?'private/dist':'dist');
+// Keep compiler/install test bundles out of Spotlight's application results.
+const app=path.join(root,'.build/artifacts.noindex',localSource?'personal':'public','Code-Codex Mac.app');
+await fs.mkdir(dist,{recursive:true});
 await fs.rm(app,{recursive:true,force:true});
 await fs.mkdir(path.join(app,'Contents/MacOS'),{recursive:true});
 await fs.mkdir(path.join(app,'Contents/Resources'),{recursive:true});
