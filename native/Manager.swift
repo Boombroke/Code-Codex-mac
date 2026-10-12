@@ -9,7 +9,7 @@ let managerName = "Code-Codex Mac"
 let buildVersion = Bundle.main.object(forInfoDictionaryKey: "CodeCodexVersion") as? String ?? "development"
 let installedManagerURL = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Applications/Code-Codex Mac.app")
 var configuredGPTURL: URL { URL(fileURLWithPath: UserDefaults.standard.string(forKey: "gptPath") ?? "/Applications/ChatGPT.app") }
-let restoreExpression = "(()=>{try{const k='code-codex-mac-backgrounds:v1';const s=JSON.parse(localStorage.getItem(k)||'{}');s.enabled=false;s.removed=true;localStorage.setItem(k,JSON.stringify(s));}catch{}window.__CCMacBackground__?.dispose();})()"
+let restoreExpression = "(()=>{try{const k='code-codex-mac-backgrounds:v1';const s=JSON.parse(localStorage.getItem(k)||'{}');s.enabled=false;s.removed=true;localStorage.setItem(k,JSON.stringify(s));}catch{}window.__CCMacBackground__?.dispose();window.__CCMacPrepaint__?.dispose();window.__CCMacBootRevision__=(window.__CCMacBootRevision__||0)+1;})()"
 
 struct ManagerError: LocalizedError {
     let message: String

@@ -33,7 +33,7 @@
   config.opacity.composer=100-config.composerTransparency;
   let renderer, canvas, media, mediaURL, mediaFile, disposed=false, mountRevision=0;
   let surface, contentSurface, positionLease, reconcileFrame=0,reconcileTimer,renderFailed=false;
-  let surfaceDirty=true,regionsDirty=true,geometryDirty=true,overlaysDirty=true,backgroundBounds;
+  let surfaceDirty=true,regionsDirty=true,geometryDirty=true,overlaysDirty=true,backgroundBounds,routeGraceDeadline=0,routeRetry,emptySurfaceDeadline=0;
   let lastCounterUpdate=0,policy;
   const regions=new Map();
   const overlays=new Map(),themeLeases=new Map();
@@ -209,6 +209,7 @@
     for(const [key,fallback,min,max] of [['transparency',100,0,100],['backgroundOpacity',100,0,100],['blur',0,0,16]]) {
       config[key]=typeof config[key]==='number'&&Number.isFinite(config[key])?Math.min(max,Math.max(min,config[key])):fallback;
     }
+    window.__CCMacPrepaint__?.update({...config,enabled:config.enabled===true&&!renderFailed});
     background.hidden=!config.enabled||!surface||renderFailed;
     surface?.toggleAttribute('data-cc-mac-active',config.enabled&&!renderFailed);
     surface?.toggleAttribute('data-cc-mac-opacity-active',config.enabled&&config.opacityEnabled&&!renderFailed);
@@ -360,6 +361,7 @@
       } else if(effect.id==='blinking-squares'){renderer=new Ctor(layer,values,onError);canvas=layer.querySelector('canvas');}
       else {canvas=document.createElement('canvas');layer.append(canvas);renderer=new Ctor(layer,canvas,values,onError);}
       background.dataset.effect=effect.id;
+      background.dataset.rendererMounts=String(Number(background.dataset.rendererMounts||0)+1);
       background.dataset.loadedModules=String(registrations?.size||0);
       status('正在运行：'+effect.name+(reduced.matches?' · 系统已开启减少动态效果':''));
       refreshMotion();
@@ -395,7 +397,7 @@
   },abort.signal);
   function diagnostics() {
     const rect=surface?.getBoundingClientRect();
-    const report={version:'1.0.0-rc.8',upstream:catalog.commit,effect:config.effect,enabled:config.enabled,paused:config.paused||settings().paused,visibility:document.visibilityState,reduceMotion:reduced.matches,frameCallbacks:frameRuntime?.frameCount,performance:policy,resolvedTone,foreground:'fixed-white-outline',backgroundReadback:false,frameStats:frameRuntime?.stats,popupRendering:'css',regions:JSON.parse(background.dataset.regions||'{}'),scope:surface?{tag:surface.tagName,id:surface.id,width:rect.width,height:rect.height}:null,canvas:canvas?{width:canvas.width,height:canvas.height,cssWidth:canvas.clientWidth,cssHeight:canvas.clientHeight,dpr:devicePixelRatio}:null,blur:config.blur,transparency:config.transparency,opacity:config.opacity,backgroundOpacity:config.backgroundOpacity,composerTransparency:config.composerTransparency,codeStyle:config.codeStyle,codeTransparency:config.codeTransparency};
+    const report={version:'1.0.0-rc.9',upstream:catalog.commit,effect:config.effect,enabled:config.enabled,paused:config.paused||settings().paused,visibility:document.visibilityState,reduceMotion:reduced.matches,frameCallbacks:frameRuntime?.frameCount,performance:policy,resolvedTone,foreground:'fixed-white-outline',backgroundReadback:false,frameStats:frameRuntime?.stats,popupRendering:'css',regions:JSON.parse(background.dataset.regions||'{}'),scope:surface?{tag:surface.tagName,id:surface.id,width:rect.width,height:rect.height}:null,canvas:canvas?{width:canvas.width,height:canvas.height,cssWidth:canvas.clientWidth,cssHeight:canvas.clientHeight,dpr:devicePixelRatio}:null,blur:config.blur,transparency:config.transparency,opacity:config.opacity,backgroundOpacity:config.backgroundOpacity,composerTransparency:config.composerTransparency,codeStyle:config.codeStyle,codeTransparency:config.codeTransparency};
     if(!navigator.clipboard?.writeText){status('当前应用未提供剪贴板接口');return;}
     void navigator.clipboard.writeText(JSON.stringify(report,null,2)).then(()=>status('诊断已复制（不含聊天内容）')).catch(()=>status('复制失败，请检查剪贴板权限'));
   }
@@ -432,6 +434,7 @@
       }
     }
     if(surface&&!surface.isConnected)surfaceDirty=true;
+    if(surfaceDirty)window.__CCMacPrepaint__?.update({...config,enabled:config.enabled===true&&!renderFailed});
     if(surfaceDirty||regionsDirty||geometryDirty||overlaysDirty)scheduleReconcile();
   });
   layoutObserver.observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:['data-app-shell-active-page','hidden','aria-hidden','class','style','role','open','data-state','data-theme','data-density','data-app-shell-left-panel-appearance','data-user-message-bubble','data-message-role','data-message-id','data-markdown-text-tone','data-thread-title','data-thread-title-trigger','data-thread-secondary-title']});
@@ -485,8 +488,8 @@
     if(theme&&config.enabled)for(const node of seen){applyThemeVars(node);}
     const counts={};for(const node of regions.keys()){const role=node.getAttribute('data-cc-mac-region');counts[role]=(counts[role]||0)+1;}background.dataset.regions=JSON.stringify(counts);
   }
-  function detachSurface() {
-    ++mountRevision;releaseRenderer();resizeObserver.disconnect();
+  function detachSurface(preserveRenderer=false) {
+    if(!preserveRenderer){++mountRevision;releaseRenderer();}resizeObserver.disconnect();
     background.remove();controls.remove();clearRegions();clearOverlays();
     if(surface) {
       surface.removeAttribute('data-cc-mac-background-surface');
@@ -515,9 +518,23 @@
   }
   function reconcile() {
     reconcileFrame=0;if(disposed)return;
-    const next=surfaceDirty?findSurface():surface;
+    let next=surfaceDirty?findSurface():surface;
+    // React can briefly remove the old main or overlap old/new main nodes.
+    // Keep the same validated shell and its renderer during that handoff.
+    if(!next&&surface?.isConnected&&surface.matches('#root,[data-app-shell-frame="true"]')) {
+      const now=performance.now();if(!routeGraceDeadline)routeGraceDeadline=now+600;
+      if(now<routeGraceDeadline){next=surface;if(!routeRetry)routeRetry=setTimeout(()=>{routeRetry=undefined;surfaceDirty=true;scheduleReconcile();},50);}
+    } else {routeGraceDeadline=0;clearTimeout(routeRetry);routeRetry=undefined;}
+    if(!next&&!surface&&config.enabled&&!renderFailed){
+      if(!emptySurfaceDeadline)emptySurfaceDeadline=performance.now()+600;
+      if(performance.now()<emptySurfaceDeadline){if(!routeRetry)routeRetry=setTimeout(()=>{routeRetry=undefined;surfaceDirty=true;scheduleReconcile();},100);}
+      else window.__CCMacPrepaint__?.update({...config,enabled:false});
+    } else if(next)emptySurfaceDeadline=0;
     if(next!==surface) {
-      detachSurface();surface=next;
+      const nextBounds=next?.getBoundingClientRect();
+      const preserveRenderer=!!renderer&&surface?.id==='root'&&next?.id==='root'&&backgroundBounds&&Math.abs(nextBounds.width-backgroundBounds.width)<1&&Math.abs(nextBounds.height-backgroundBounds.height)<1;
+      detachSurface(preserveRenderer);surface=next;
+      if(!surface)window.__CCMacPrepaint__?.update({...config,enabled:false});
       if(surface) {
         if(getComputedStyle(surface).position==='static') {
           positionLease={value:surface.style.getPropertyValue('position'),priority:surface.style.getPropertyPriority('position')};
@@ -525,12 +542,12 @@
         }
         surface.setAttribute('data-cc-mac-background-surface','v3');markRegions();
         surface.prepend(background);document.body.append(controls);resizeObserver.observe(surface);
-        mount();ui.render();
+        if(preserveRenderer){applyPresentation();frameRuntime?.invalidate();refreshMotion();}else mount();ui.render();
       }
     } else if(surface) {
-      if(regionsDirty)markRegions();
+      if(regionsDirty&&contentSurface)markRegions();
       // React may replace the surface's children without replacing its outer node.
-      if(background.parentElement!==surface){surface.prepend(background);mount();}
+      if(background.parentElement!==surface){surface.prepend(background);if(renderer){frameRuntime?.invalidate();refreshMotion();}else mount();}
       if(!controls.isConnected)document.body.append(controls);
     }
     if(geometryDirty){positionControls();backgroundBounds=background.getBoundingClientRect();if(applyRenderPolicy()&&renderer)mount();}
@@ -542,7 +559,7 @@
   window.addEventListener('resize',()=>{geometryDirty=true;surfaceDirty=true;overlaysDirty=true;scheduleReconcile();},{signal:abort.signal});
   window.addEventListener('scroll',()=>{if(surface){geometryDirty=true;overlaysDirty=true;scheduleReconcile();}},{capture:true,passive:true,signal:abort.signal});
   for(const target of [document,shadow])target.addEventListener('animationend',event=>{if(event.target instanceof Element&&event.target.matches(overlaySelector)){overlaysDirty=true;scheduleReconcile();}},{capture:true,signal:abort.signal});
-  function dispose() {if(disposed)return;disposed=true;ui?.close();abort.abort();themeObserver.disconnect();layoutObserver.disconnect();cancelAnimationFrame(reconcileFrame);clearTimeout(reconcileTimer);detachSurface();for(const node of [...themeLeases.keys()])restoreThemeVars(node);frameRuntime?.dispose();style.remove();delete window[API];}
-  window[API]=Object.freeze({version:'1.0.0-rc.8',dispose});
+  function dispose() {if(disposed)return;disposed=true;ui?.close();abort.abort();themeObserver.disconnect();layoutObserver.disconnect();cancelAnimationFrame(reconcileFrame);clearTimeout(reconcileTimer);clearTimeout(routeRetry);detachSurface();for(const node of [...themeLeases.keys()])restoreThemeVars(node);frameRuntime?.dispose();style.remove();window.__CCMacPrepaint__?.dispose();delete window[API];}
+  window[API]=Object.freeze({version:'1.0.0-rc.9',dispose});
   reconcile();persist();
 })();

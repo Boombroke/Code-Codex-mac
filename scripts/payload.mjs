@@ -8,6 +8,7 @@ import {createAppearanceUI} from './appearance-ui.mjs';
 import {createRenderPolicy} from './render-policy.mjs';
 import {createMaterials} from './material-model.mjs';
 import {createContrastModel} from './contrast-model.mjs';
+import {createPrepaint} from './prepaint.mjs';
 export async function payload(root, assetRoot=root) {
   const catalog=JSON.parse(await fs.readFile(path.join(assetRoot,'catalog.json'),'utf8'));
   const scripts=[],loaders=[];
@@ -50,5 +51,5 @@ export async function payload(root, assetRoot=root) {
   for(const effect of menu.effects)if(typeof effect.card!=='string'||!effect.card.includes('data-appearance-plugin="'+effect.pluginId+'"')||typeof effect.panel!=='string'||!effect.panel.includes('id="cle-'+effect.suffix+'-settings"'))throw Error('Appearance card or settings panel is missing: '+effect.id);
   scripts.push(uiBytes.toString('utf8'),'window.__CC_MAC_APPEARANCE_UI__='+createAppearanceUI.toString()+';');
   scripts.push(await fs.readFile(path.join(root,'controller.js'),'utf8'));
-  return `(() => { const boot=()=>{const hostWindow=window;window.__CCMacBackground__?.dispose();const frameRuntime=(${createFrameRuntime.toString()})(hostWindow);hostWindow[Symbol.for('code-codex-mac:frames:v1')]=frameRuntime;\n${scripts.join('\n;\n')}\n}; if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();})();`;
+  return `(() => { window.__CCMacBackground__?.dispose();const revision=(window.__CCMacBootRevision__||0)+1;window.__CCMacBootRevision__=revision;const prepaint=(${createPrepaint.toString()})(window);const boot=()=>{if(window.__CCMacBootRevision__!==revision)return;const hostWindow=window;const frameRuntime=(${createFrameRuntime.toString()})(hostWindow);hostWindow[Symbol.for('code-codex-mac:frames:v1')]=frameRuntime;\n${scripts.join('\n;\n')}\n}; if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();})();`;
 }

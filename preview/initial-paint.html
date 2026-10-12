@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Code-Codex Mac · 首绘制与路由切换模拟</title>
+  <style>
+    *{box-sizing:border-box}html,body{margin:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif}
+    :root{--theme-variant:light;--color-surface:#fff;--color-background-panel:#f3f5f8;--color-background-primary-soft-alpha:#f3f5f8;--color-background-primary-solid:#101827;--color-text:#14202b;--color-text-secondary:#465462;--color-text-tertiary:#526071;--color-text-user-message:#28334a;--color-background-user-message:transparent;--color-border-default:#c0c9d3;--color-text-success:#34d399;--color-chart-blue:#8b40ff;--color-control-thumb-on-accent:#fff;--color-codex-editor-cursor:#14202b}
+    :root[data-theme=dark]{--theme-variant:dark;--color-surface:#161b23;--color-background-panel:#20242c;--color-background-primary-soft-alpha:#20242c;--color-background-primary-solid:#f2f6ff;--color-text:#edf3fb;--color-text-secondary:#bac5d1;--color-text-tertiary:#bac5d1;--color-codex-editor-cursor:#edf3fb}
+    html,body{background:var(--color-surface)}body{height:100vh;display:flex;flex-direction:column;color:var(--color-text)}
+    #fixture-tools{padding:10px 14px;background:#dce6ee;color:#172533;flex-shrink:0;border-bottom:1px solid #8d9aaa;font-size:12px}#fixture-options{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px}#fixture-options label{display:flex;gap:5px;align-items:center}button,input,select{font:inherit}button{cursor:pointer;padding:5px 9px;border:1px solid #8d9aaa;border-radius:6px;background:#f3f6fa;color:#172533}input[type=number]{width:65px}#fixture-status{margin:7px 0 0}#fixture-details{margin-top:7px}#initial-paint-report{margin:7px 0 0;max-height:200px;overflow:auto;font:11px/1.4 ui-monospace,monospace;white-space:pre-wrap}
+    #fixture-mount{flex:1;min-height:0;display:flex}#root{flex:1;position:relative;min-height:0;overflow:hidden;background:var(--color-surface)}.frame{height:100%;display:flex;flex-direction:column;background:var(--color-surface)}header{height:40px;flex-shrink:0;display:flex;gap:20px;align-items:center;padding:0 18px;background:var(--color-surface);border-bottom:1px solid var(--color-border-default)}.workspace{display:flex;flex:1;min-height:0;background:var(--color-surface)}
+    aside{width:265px;flex-shrink:0;overflow:auto;border-right:1px solid var(--color-border-default);background:var(--color-surface)}.sidebar-navigation{padding:20px 12px;min-height:100%;background:var(--color-surface)}._Navigation_1uxfp_2{--color-text:color-mix(in oklab,var(--color-background-primary-solid) 85%,transparent);color:var(--color-text)}nav h2{font-size:12px;font-weight:500;margin:8px}.sidebar-item{display:flex;align-items:center;gap:8px;min-height:37px;padding:8px;border-radius:7px}.text-default{color:var(--color-text)}.text-secondary{color:var(--color-text-secondary)}.text-tertiary{color:var(--color-text-tertiary)}.text-success{color:var(--color-text-success)}[data-thread-title-trigger]{min-width:0;flex:1}.text-fade-truncate{display:block;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+    .page-stack{flex:1;min-width:0;display:flex}.page{flex:1;min-width:0;display:flex;flex-direction:column;background:var(--color-surface)}[data-app-shell-active-page=false]{display:none!important}main{flex:1;min-width:0;overflow:auto;display:flex;flex-direction:column;padding:26px 34px;background:var(--color-surface);color:var(--color-text)}.conversation{width:100%;max-width:760px;margin:0 auto;display:flex;flex-direction:column;min-height:100%}h1{font-size:25px;margin:0 0 18px}.assistant-content{line-height:1.8;margin:12px 0}.text-user-message,[data-markdown-text-tone=user-message]{color:var(--color-text-user-message)}.bg-user-message{background:var(--color-background-user-message)}._bubble_11evq_1{max-width:80%;margin:15px 0 20px auto;padding:12px 17px;border-radius:14px;border:1px solid var(--color-border-default);line-height:1.8}
+    .group\/settings{display:flex;flex-direction:column;gap:9px;margin:18px 0}.settings-card{border:1px solid var(--color-border-default);border-radius:16px;overflow:hidden}.settings-row{display:flex;justify-content:space-between;gap:20px;align-items:center;padding:12px 16px;border-bottom:1px solid var(--color-border-default)}.settings-row:last-child{border-bottom:0}.native-button{background:var(--color-background-primary-soft-alpha);color:var(--color-text);border-color:var(--color-border-default)}.composer{margin-top:auto;padding:13px 15px;background:var(--color-surface);border:1px solid var(--color-border-default);border-radius:14px}.ProseMirror{min-height:45px;outline:none;color:var(--color-text);caret-color:var(--color-codex-editor-cursor)}.composer-footer{display:flex;align-items:center;justify-content:space-between;margin-top:8px}.send-button{background:#314c7b;border-color:#314c7b;color:#fff}
+    @media(max-width:900px){aside{width:225px}main{padding:22px}.workspace{min-height:0}}
+  </style>
+  <script>
+    (()=>{
+      'use strict';
+      const params=new URLSearchParams(location.search),theme=params.get('theme')==='dark'?'dark':'light';
+      const enabled=!params.has('disabled'),removed=params.has('removed'),themeRequested=enabled&&!removed,baseline=params.has('baseline');
+      const bounded=(key,fallback,min,max)=>params.has(key)&&Number.isFinite(Number(params.get(key)))?Math.max(min,Math.min(max,Number(params.get(key)))):fallback;
+      const insertionDelay=bounded('delay',220,0,1000),duration=bounded('duration',3000,insertionDelay+2200,10000),effect=params.get('effect')||'black-hole';
+      document.documentElement.dataset.theme=theme;
+      localStorage.setItem('code-codex-mac-backgrounds:v1',JSON.stringify({enabled,removed,layoutVersion:4,materialVersion:1,clarityVersion:2,effect,transparency:100,backgroundOpacity:100,composerTransparency:75,codeTransparency:60,codeStyle:'frosted',tone:'auto',performance:'balanced',settings:{}}));
+      const started=performance.now(),hiddenAtStart=document.hidden,events=[],runs=[],errors=[],visibilityChanges=[],framesByStage={},opaqueFramesByRegion={},unexpectedTransparentByRegion={};
+      let phase='waiting-dom',stage='head',frameCount=0,visibleFrameCount=0,opaqueNativeFrames=0,opaqueAnyFrames=0,unexpectedTransparentFrames=0,lastSignature='',rafID,finishTimer;
+      const round=n=>Math.round(n*1000)/1000,event=(name,extra={})=>events.push({name,atMs:round(performance.now()-started),...extra});
+      const nativeColors=theme==='light'?[[255,255,255],[243,245,248]]:[[22,27,35],[32,36,44]];
+      function colorParts(value){const numbers=(value.match(/[-+]?(?:\d*\.)?\d+/g)||[]).map(Number);let alpha=value==='transparent'?0:1;if(value.startsWith('rgba(')&&numbers.length>=4)alpha=numbers[3];else if(value.includes('/'))alpha=Number(value.split('/')[1].replace(/[)%]/g,''));return {rgb:numbers.slice(0,3),alpha};}
+      function inspect(node,kind){
+        const css=getComputedStyle(node),background=colorParts(css.backgroundColor),isNative=background.alpha>=.98&&nativeColors.some(rgb=>rgb.every((v,i)=>Math.abs(v-background.rgb[i])<1));
+        return {kind,nodeID:node.id,background:css.backgroundColor,backgroundImage:css.backgroundImage,foreground:css.color,caretColor:kind==='composer'?getComputedStyle(node.querySelector('.ProseMirror')).caretColor:null,alpha:background.alpha,opaqueNative:themeRequested&&isNative,opaqueAny:themeRequested&&background.alpha>=.98,unexpectedTransparent:!themeRequested&&background.alpha<.98,marker:node.getAttribute('data-cc-mac-region'),scope:node.getAttribute('data-cc-mac-background-surface'),active:node.hasAttribute('data-cc-mac-active')};
+      }
+      function sample(time){
+        if(phase==='complete')return;
+        frameCount++;framesByStage[stage]=(framesByStage[stage]||0)+1;
+        const root=document.getElementById('root'),nodes=[];
+        if(root){
+          nodes.push(inspect(root,'root'));
+          const sidebar=root.querySelector('aside');if(sidebar)nodes.push(inspect(sidebar,'sidebar'));
+          for(const main of root.querySelectorAll('main[data-app-shell-main-surface="default"]')){
+            if(main.closest('[data-app-shell-active-page="false"]'))continue;
+            nodes.push(inspect(main,'main'));
+            for(const [kind,selector]of [['settings-card','[data-fixture-card]'],['composer','[data-composer-layout]']]){const node=main.querySelector(selector);if(node)nodes.push(inspect(node,kind));}
+          }
+          visibleFrameCount++;
+        }
+        let native=false,opaque=false,unexpected=false;
+        for(const node of nodes){if(node.opaqueNative){native=true;opaqueFramesByRegion[node.kind]=(opaqueFramesByRegion[node.kind]||0)+1;}if(node.opaqueAny)opaque=true;if(node.unexpectedTransparent){unexpected=true;unexpectedTransparentByRegion[node.kind]=(unexpectedTransparentByRegion[node.kind]||0)+1;}}
+        if(native)opaqueNativeFrames++;if(opaque)opaqueAnyFrames++;if(unexpected)unexpectedTransparentFrames++;
+        const state={stage,readyState:document.readyState,documentTheme:document.documentElement.dataset.theme,documentBackground:{html:getComputedStyle(document.documentElement).backgroundColor,body:document.body?getComputedStyle(document.body).backgroundColor:null},headFlags:[...document.documentElement.attributes].filter(a=>a.name.startsWith('data-cc-mac')).map(a=>[a.name,a.value]),backgroundPresent:!!document.getElementById('cc-mac-background'),rendererMounts:Number(document.getElementById('cc-mac-background')?.dataset.rendererMounts||0),nodes},signature=JSON.stringify(state);
+        if(signature===lastSignature){const run=runs[runs.length-1];run.lastFrame=frameCount;run.endMs=round(time-started);run.frames++;}
+        else {runs.push({firstFrame:frameCount,lastFrame:frameCount,startMs:round(time-started),endMs:round(time-started),frames:1,...state});lastSignature=signature;}
+        rafID=requestAnimationFrame(sample);
+      }
+      const markers=new MutationObserver(records=>{
+        if(phase==='complete')return;
+        for(const r of records){
+          if(r.type!=='attributes'||!r.attributeName.startsWith('data-cc-mac')||events.length>=300)continue;
+          event('adapter-marker',{node:r.target.id||r.target.tagName,attribute:r.attributeName,value:r.target.getAttribute(r.attributeName)});
+        }
+      });markers.observe(document.documentElement,{attributes:true,childList:true,subtree:true});
+      document.addEventListener('visibilitychange',()=>visibilityChanges.push({atMs:round(performance.now()-started),hidden:document.hidden}));
+      window.addEventListener('error',e=>errors.push({message:e.message,line:e.lineno}));window.addEventListener('unhandledrejection',e=>errors.push({message:String(e.reason?.message||e.reason)}));
+      function page(name){
+        const wrap=document.createElement('section');wrap.className='page';wrap.dataset.appShellActivePage='true';wrap.dataset.appShellPageSurface='true';wrap.dataset.fixtureRoute=name;
+        wrap.innerHTML='<main id="main-'+name+'" class="main-surface" data-app-shell-main-surface="default"><div class="conversation"><h1 class="text-default"></h1><div class="assistant-content text-secondary">此区域模拟原生浅色或暗色实底，每帧检查它是否曾在主题启用时闪回原生颜色。</div><div data-user-message-bubble class="bg-user-message text-user-message _bubble_11evq_1"><div data-markdown-text-tone="user-message">只使用独立示例内容，不连接 GPT 或真实聊天。</div></div><div class="group/settings" data-density="default"><div class="text-default">设置卡片</div><div id="card-'+name+'" data-fixture-card class="settings-card rounded-2xl" style="background-color:var(--color-background-panel,var(--color-background-primary-soft-alpha))"><div class="settings-row @container/settings-row"><span class="text-default">原生设置行</span><button class="native-button bg-primary-soft-alpha" aria-haspopup="menu">编辑器 ▾</button></div><div class="settings-row @container/settings-row"><span class="text-secondary">背景首绘制</span><button class="native-button bg-primary-soft-alpha">检查</button></div></div></div><div id="composer-'+name+'" class="composer" data-composer-layout="default" data-composer-surface-variant="default"><div class="ProseMirror text-default" contenteditable="true" role="textbox" aria-label="独立输入框" data-composer-input>光标与文字应保持可读。</div><div class="composer-footer"><span class="text-secondary">75% 透明度</span><button class="send-button">发送示例</button></div></div></div></main>';
+        wrap.querySelector('h1').textContent='模拟路由 · '+name;return wrap;
+      }
+      function app(name){
+        const root=document.createElement('div');root.id='root';
+        root.innerHTML='<div class="frame" data-app-shell-frame="true"><header data-app-shell-titlebar><span data-app-shell-titlebar-content>Code-Codex Mac</span><span class="text-secondary">首绘制与路由切换回归模拟</span></header><div class="workspace"><aside id="sidebar-'+name+'" class="app-shell-left-panel" data-app-shell-left-panel-appearance="default"><div class="sidebar-navigation"><nav class="_Navigation_1uxfp_2" role="navigation"><h2 class="text-secondary">最近任务</h2><div class="sidebar-item" role="button"><span class="text-success">●</span><div class="text-default" data-thread-title-trigger><span data-thread-title class="text-fade-truncate">检查首帧颜色</span></div></div><div class="sidebar-item text-default" role="button">新聊天</div><h2 class="text-secondary">项目</h2><div class="sidebar-item sidebar-row-focus group/folder-row text-default" role="button">独立模拟项目</div></nav></div></aside><div class="page-stack"></div></div></div>';
+        root.querySelector('.page-stack').append(page(name));return root;
+      }
+      window.initialPaintReport=()=>({scope:'synthetic RAF style observation only; not a real GPT screenshot or native-window paint trace',phase,adapterVersion:window.__CCMacBackground__?.version||null,baseline,theme,enabled,removed,themeRequested,effect,insertionDelayMs:insertionDelay,durationMs:duration,elapsedMs:round(performance.now()-started),viewport:{width:innerWidth,height:innerHeight,dpr:devicePixelRatio},frameCount,visibleFrameCount,hiddenAtStart,validVisibleObservation:visibleFrameCount>20&&!hiddenAtStart&&visibilityChanges.every(e=>!e.hidden),framesByStage,opaqueNativeFrames,opaqueAnyFrames,opaqueFramesByRegion,unexpectedTransparentFrames,unexpectedTransparentByRegion,visibilityChanges,events,runs,errors});
+      function show(){const output=document.getElementById('initial-paint-report');if(output){output.dataset.phase=phase;output.textContent=JSON.stringify(window.initialPaintReport(),null,2);}}
+      function finish(){phase='complete';cancelAnimationFrame(rafID);markers.disconnect();event('sampling-complete');show();document.getElementById('fixture-status').textContent='采样完成 · '+(themeRequested?'主题启用期间原生实底帧：'+opaqueNativeFrames:'主题关闭/移除，误透明化帧：'+unexpectedTransparentFrames)+' · 此结果仅代表独立模拟页。';}
+      function begin(){
+        phase='running';stage='waiting-root';event('dom-content-loaded');
+        const mount=document.getElementById('fixture-mount');
+        setTimeout(()=>{stage='initial-root';mount.append(app('initial'));event('root-inserted');},insertionDelay);
+        setTimeout(()=>{const root=document.getElementById('root');if(!root)return;stage='active-page-overlap';const old=root.querySelector('[data-app-shell-active-page="true"]'),next=page('switched');root.querySelector('.page-stack').append(next);event('two-active-pages');setTimeout(()=>{stage='active-page-switch';old.dataset.appShellActivePage='false';event('active-page-switched');},120);},insertionDelay+450);
+        setTimeout(()=>{const root=document.getElementById('root');if(!root)return;stage='main-replacement';root.querySelector('.page-stack').replaceChildren(page('replaced'));event('main-replaced');},insertionDelay+1000);
+        setTimeout(()=>{stage='root-replacement';mount.replaceChildren(app('new-root'));event('root-replaced');},insertionDelay+1600);
+        const byId=id=>document.getElementById(id);byId('theme').value=theme;byId('disabled').checked=!enabled;byId('removed').checked=removed;byId('baseline').checked=baseline;byId('delay').value=insertionDelay;byId('duration').value=duration;byId('snapshot').onclick=show;
+        finishTimer=setTimeout(finish,duration);
+      }
+      event('head-instrumentation-ready',{readyState:document.readyState});rafID=requestAnimationFrame(sample);document.addEventListener('DOMContentLoaded',begin,{once:true});
+      window.addEventListener('pagehide',()=>{clearTimeout(finishTimer);cancelAnimationFrame(rafID);markers.disconnect();},{once:true});
+    })();
+  </script>
+  <script src="/payload.js"></script>
+  <script>document.documentElement.dataset.fixtureHeadPayloadReturned='true';</script>
+</head>
+<body>
+  <section id="fixture-tools">
+    <form id="fixture-options" action="/initial-paint" method="get">
+      <label>主题<select id="theme" name="theme"><option value="light">亮色</option><option value="dark">暗色</option></select></label>
+      <label><input id="baseline" name="baseline" value="1" type="checkbox">rc.8 基线</label>
+      <label><input id="disabled" name="disabled" value="1" type="checkbox">启动关闭</label>
+      <label><input id="removed" name="removed" value="1" type="checkbox">启动已移除</label>
+      <label>插入延迟毫秒<input id="delay" name="delay" value="220" type="number" min="0" max="1000"></label>
+      <label>总采样毫秒<input id="duration" name="duration" value="3000" type="number" min="2200" max="10000"></label>
+      <button type="submit">重新加载条件</button><button id="snapshot" type="button">显示统计</button>
+    </form>
+    <p id="fixture-status" role="status">head 提前加载适配代码，然后延迟创建原生实底容器、切换路由并替换 DOM。统计只代表独立模拟页。</p>
+    <details id="fixture-details"><summary>首绘制报告（完成后自动更新）</summary><pre id="initial-paint-report" data-phase="waiting-dom"></pre></details>
+  </section>
+  <div id="fixture-mount"></div>
+</body>
+</html>
