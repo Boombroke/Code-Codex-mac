@@ -1,0 +1,425 @@
+{
+  "source": "https://github.com/Rice-dog/code-codex",
+  "commit": "6cef54643bb4b446f4bd81f2e3fa5f576629f674",
+  "version": "0.4.4",
+  "script": "vendor/upstream-appearance-ui.js",
+  "size": 236829,
+  "sha256": "cf354938f9b6ba5256443ff5d85ac3edcc31374ae1806ee355f548df9f06ab50",
+  "files": [
+    {
+      "file": "startup-background-renderers.ts",
+      "sha256": "649e7a844a805d2b295be3c334d5e0dcd6ff3944797d234e7ec720fcf99d4c5b"
+    },
+    {
+      "file": "blinking-squares-settings.ts",
+      "sha256": "d0fca5823477b0182524435816e3c926eab0f27bea0a9ba54156518f4eaf84c0"
+    },
+    {
+      "file": "icons.ts",
+      "sha256": "8c7b1ab4d03eacc57f24a4d178afc47362778417f0aa86daf079e46123542489"
+    },
+    {
+      "file": "explorer-element.ts",
+      "sha256": "ec054eac8148b51fa0bf8a48565002e555a06b8aa58c87aa990d788d1d5cd242"
+    },
+    {
+      "file": "surface-opacity.ts",
+      "sha256": "715ce91c374c6ef8cd9b768b0cee2bba03524d9ecc7a81c79a6149bbf161da75"
+    },
+    {
+      "file": "surface-opacity-runtime.ts",
+      "sha256": "ec2ffd8596be90fae172d21ded529c6c6e09ca7034e5e3d440c6389ba8f7d938"
+    },
+    {
+      "file": "styles.ts",
+      "sha256": "92cc3152ed462a689f2234b3994f9ae30fb299d73fdd0eb342f830e3732eb367"
+    }
+  ],
+  "declarations": [
+    {
+      "file": "startup-background-renderers.ts",
+      "name": "DEFAULT_AURORA_IONOSPHERE_BACKGROUND_SETTINGS",
+      "line": 218,
+      "sha256": "29e8a328337c52185efb4afee736b966b3d418f86658ddc52592017b363a840c"
+    },
+    {
+      "file": "startup-background-renderers.ts",
+      "name": "DEFAULT_HEAVENLY_CLOUD_BACKGROUND_SETTINGS",
+      "line": 193,
+      "sha256": "170889929a5867451839cbbd17fc1806afe73df202ce2de585036a43388952bf"
+    },
+    {
+      "file": "startup-background-renderers.ts",
+      "name": "DEFAULT_BLACK_HOLE_BACKGROUND_SETTINGS",
+      "line": 128,
+      "sha256": "d36194518a8ee65303265dcc856f926b952c8a0c9d673eb97c3125ed8db9d792"
+    },
+    {
+      "file": "startup-background-renderers.ts",
+      "name": "DEFAULT_GLOW_HORIZON_BACKGROUND_SETTINGS",
+      "line": 156,
+      "sha256": "b93fb8ebeece576f5e3a6808c8c23aa84c2d83c4311a52727efc7eb833bc3f0c"
+    },
+    {
+      "file": "startup-background-renderers.ts",
+      "name": "DEFAULT_MILKY_WAY_BACKGROUND_SETTINGS",
+      "line": 1930,
+      "sha256": "89595c1479ed1f883a4d3408f878a38206f99fca7132aab1c9890487da235789"
+    },
+    {
+      "file": "startup-background-renderers.ts",
+      "name": "MOUNTAIN_DEFAULTS",
+      "line": 2153,
+      "sha256": "a041ec73060742bf239737014dabfc0968317ed826a4addac4e4c0f8d7f5750f"
+    },
+    {
+      "file": "startup-background-renderers.ts",
+      "name": "CLOUD_TRAIN_DEFAULTS",
+      "line": 2438,
+      "sha256": "256e769f0afe69ae11aa875ef24829cfee0ac8b467a00567aaccf27eca16d614"
+    },
+    {
+      "file": "startup-background-renderers.ts",
+      "name": "MILKY_WAY_NUMERIC_CONTROL_DEFINITIONS",
+      "line": 1937,
+      "sha256": "0e05f1067006153e8d1bc53da3ff1ec01bdbdcd21a65d41f1940e3b6661c3269"
+    },
+    {
+      "file": "startup-background-renderers.ts",
+      "name": "MOUNTAIN_CONTROLS",
+      "line": 2157,
+      "sha256": "d771b110ca96001875d06de6aff40459db6cd7622223e62fc9d598e32d5d770a"
+    },
+    {
+      "file": "startup-background-renderers.ts",
+      "name": "CLOUD_TRAIN_CONTROLS",
+      "line": 2442,
+      "sha256": "eb0dcd73ecdcbd5dd6fe3bdf9c1c144e57751db4013531e77c4a92665e4eed2b"
+    },
+    {
+      "file": "startup-background-renderers.ts",
+      "name": "CLOUD_TRAIN_TINTS",
+      "line": 2459,
+      "sha256": "58ecf01d502fb54ee0dd903c063e668dc5ad8ce987f76087a9230eab801dc412"
+    },
+    {
+      "file": "startup-background-renderers.ts",
+      "name": "BLINKING_SQUARES_CONTROLS",
+      "line": 2388,
+      "sha256": "0541cea1a4e5fe6cab980932bbbc0a3bcd3b565542e13331c09f95da15c467bb"
+    },
+    {
+      "file": "blinking-squares-settings.ts",
+      "name": "BLINKING_SQUARES_DEFAULTS",
+      "line": 13,
+      "sha256": "694d12c142bf5436ef8ae4d44144bde9c6165e74c819c421aa82204b6c87ba65"
+    },
+    {
+      "file": "icons.ts",
+      "name": "common",
+      "line": 1,
+      "sha256": "d65a286a110a86058862d3ed6baeafbee9fbf06cc5724c45499dbc637339df55"
+    },
+    {
+      "file": "icons.ts",
+      "name": "icons",
+      "line": 3,
+      "sha256": "3a127fbecddfc6ade9cfd40939e94bd8053e5d7236846d4f549d4253d7ec578c"
+    },
+    {
+      "file": "explorer-element.ts",
+      "name": "bilingualLabelMarkup",
+      "line": 1013,
+      "sha256": "8fe9423420a94c0190caf093cfbdf44716645125c32114b99b22d17a394089a3"
+    },
+    {
+      "file": "explorer-element.ts",
+      "name": "backgroundLanguageSwitchMarkup",
+      "line": 1036,
+      "sha256": "27391bf738409ca706cb884d9333b5c45b76e58ac1010394c1e454503a8babab"
+    },
+    {
+      "file": "explorer-element.ts",
+      "name": "BLACK_HOLE_BACKGROUND_PRESETS",
+      "line": 897,
+      "sha256": "71348dcce24a7f873f528f004f6bdcdf64f013eb6a0d0737c619e65aac8eae80"
+    },
+    {
+      "file": "explorer-element.ts",
+      "name": "BLACK_HOLE_NUMERIC_CONTROL_DEFINITIONS",
+      "line": 932,
+      "sha256": "6a262c7a253e4a5654c8d44ef8b264118304a429949f904e6f3e5238de1ab120"
+    },
+    {
+      "file": "explorer-element.ts",
+      "name": "GLOW_HORIZON_NUMERIC_CONTROL_DEFINITIONS",
+      "line": 956,
+      "sha256": "2e3ad16edbef48fbffb25a8fae6a8267767bde5734040ac6ed43adfd1246cb43"
+    },
+    {
+      "file": "explorer-element.ts",
+      "name": "HEAVENLY_CLOUD_NUMERIC_CONTROL_DEFINITIONS",
+      "line": 977,
+      "sha256": "6d535073132177c76daa1267950cad79aece81d519fee65272d13dffe32621fe"
+    },
+    {
+      "file": "explorer-element.ts",
+      "name": "AURORA_IONOSPHERE_NUMERIC_CONTROL_DEFINITIONS",
+      "line": 988,
+      "sha256": "6e94b9d2d5b30101555dad30aa530cf997d449f009ea4be2b640ff17dead4cc8"
+    },
+    {
+      "file": "explorer-element.ts",
+      "name": "BLACK_HOLE_BACKGROUND_PLUGIN_ID",
+      "line": 237,
+      "sha256": "f729cdb6006e2c1c858c07f760cf03929fa74b3ff70e93f89287bd4759e7a160"
+    },
+    {
+      "file": "explorer-element.ts",
+      "name": "formatBlackHoleControlValue",
+      "line": 4820,
+      "sha256": "e31f969decf8c44806fe4b3f011026ea32d2f06f051534ac2f5f03aedbe1b40f"
+    },
+    {
+      "file": "explorer-element.ts",
+      "name": "blackHoleNumericControlsMarkup",
+      "line": 4826,
+      "sha256": "8cad07344b9261fe7adef5abf5cb7729b390668215ed5998c5cdcb6498fd58aa"
+    },
+    {
+      "file": "explorer-element.ts",
+      "name": "blackHoleBackgroundCardMarkup",
+      "line": 4843,
+      "sha256": "800a5909210ae9c85201c920521b099d1bfca1788fb265c9ffc0abe602c860b9"
+    },
+    {
+      "file": "explorer-element.ts",
+      "name": "blackHoleSettingsPanelMarkup",
+      "line": 4862,
+      "sha256": "388471f9c0450236f399212299a86b2aba7c8a805f71a71ff9f57953b7afba0c"
+    },
+    {
+      "file": "explorer-element.ts",
+      "name": "GLOW_HORIZON_BACKGROUND_PLUGIN_ID",
+      "line": 238,
+      "sha256": "e328b38da30e83e0077639b87ee8cc16a3bfabd0c318a468d9297ea536068f96"
+    },
+    {
+      "file": "explorer-element.ts",
+      "name": "formatGlowHorizonControlValue",
+      "line": 4920,
+      "sha256": "761720d62b434a7c29901811596fe79451840256f5a7bdc8f5e299f319a71bf6"
+    },
+    {
+      "file": "explorer-element.ts",
+      "name": "glowHorizonNumericControlsMarkup",
+      "line": 4928,
+      "sha256": "3711123ab7007fa74e54928b4f8233a41b9f564991bddc1577520aefdc036a19"
+    },
+    {
+      "file": "explorer-element.ts",
+      "name": "glowHorizonBackgroundCardMarkup",
+      "line": 4945,
+      "sha256": "ea710e2c496688dd4bffd3a40d0e164b78de94e3a89d96f9ebb28dea86f0e325"
+    },
+    {
+      "file": "explorer-element.ts",
+      "name": "glowHorizonSettingsPanelMarkup",
+      "line": 4964,
+      "sha256": "84cbe4fd50c73cc31b7433a3e8e28a3132174a0fca540c112b2de98bb11fa130"
+    },
+    {
+      "file": "explorer-element.ts",
+      "name": "HEAVENLY_CLOUD_BACKGROUND_PLUGIN_ID",
+      "line": 239,
+      "sha256": "8944eeb08666f0609f2a0ba7a7e3f62ca51bbc3dfc6b6e2e12560bc7411c75f3"
+    },
+    {
+      "file": "explorer-element.ts",
+      "name": "formatHeavenlyCloudControlValue",
+      "line": 5025,
+      "sha256": "9ac2aca8445681272166462c0aea00183f0e50b14fe91c6581d185594f5f60eb"
+    },
+    {
+      "file": "explorer-element.ts",
+      "name": "heavenlyCloudNumericControlsMarkup",
+      "line": 5033,
+      "sha256": "6acb7c367e9ae53840cd01dcd64efe7df1f071590fa948cf091ed31ae608e974"
+    },
+    {
+      "file": "explorer-element.ts",
+      "name": "heavenlyCloudBackgroundCardMarkup",
+      "line": 5050,
+      "sha256": "4fc894a24bba576bf3a4e3af58f80305a4e8034b87f0f5ea13c91e256d2e3f43"
+    },
+    {
+      "file": "explorer-element.ts",
+      "name": "heavenlyCloudSettingsPanelMarkup",
+      "line": 5069,
+      "sha256": "7c351be3b29e0ec972c70769b58083c5081ae6bb12e87c578abcc6a812a4e0c6"
+    },
+    {
+      "file": "explorer-element.ts",
+      "name": "AURORA_IONOSPHERE_BACKGROUND_PLUGIN_ID",
+      "line": 240,
+      "sha256": "42a2a3710e41f685c75b499087d772dcd4db02ac3a87e9648cd7571a67734d60"
+    },
+    {
+      "file": "explorer-element.ts",
+      "name": "formatAuroraIonosphereControlValue",
+      "line": 5117,
+      "sha256": "6a1521fcd9596ba8719ed1ad11e9e53f7e597c3907caa51e50ae4ff4d13c5998"
+    },
+    {
+      "file": "explorer-element.ts",
+      "name": "auroraIonosphereNumericControlsMarkup",
+      "line": 5125,
+      "sha256": "47c48eae5523f8d0f06e6b81a028ac3fa4fee7a796d24913a916824180395008"
+    },
+    {
+      "file": "explorer-element.ts",
+      "name": "auroraIonosphereBackgroundCardMarkup",
+      "line": 5142,
+      "sha256": "6045f47e6b8a4d71e0bf08f7d7ad06e88199dfa16bedb10ff5ca81eb77a20d50"
+    },
+    {
+      "file": "explorer-element.ts",
+      "name": "auroraIonosphereSettingsPanelMarkup",
+      "line": 5161,
+      "sha256": "f71576c468139eb3b27d1028eb9c12eeaf043b86f7acbae340c3c26013f7eef0"
+    },
+    {
+      "file": "explorer-element.ts",
+      "name": "MILKY_WAY_BACKGROUND_PLUGIN_ID",
+      "line": 244,
+      "sha256": "2858a072f850fcb626a4c5025fee21ba4fe35e477c25c83c3da68ce17616f2f0"
+    },
+    {
+      "file": "explorer-element.ts",
+      "name": "formatMilkyWayControlValue",
+      "line": 5204,
+      "sha256": "259211bc5cb33626120e18df992ff60936e36b1ea4b1dce88e99228584537805"
+    },
+    {
+      "file": "explorer-element.ts",
+      "name": "milkyWayNumericControlsMarkup",
+      "line": 5212,
+      "sha256": "391a24b78aaa5e0f316623af42fc6b8d3f48710b067233880c301056590a40f2"
+    },
+    {
+      "file": "explorer-element.ts",
+      "name": "milkyWayBackgroundCardMarkup",
+      "line": 5229,
+      "sha256": "3d1084097eacb81e728c0a682f52c71a9f4ebccf3960b23054970e44a3b6c755"
+    },
+    {
+      "file": "explorer-element.ts",
+      "name": "milkyWaySettingsPanelMarkup",
+      "line": 5248,
+      "sha256": "ec8690dc78f5face9c5a058a0c16154438e4ec8a8ee2f175193364b936d8c298"
+    },
+    {
+      "file": "explorer-element.ts",
+      "name": "MOUNTAIN_BACKGROUND_PLUGIN_ID",
+      "line": 241,
+      "sha256": "ce14441a1b29ceb03577ca834c8c8d336442f1ba2ed95c8cba43f8b25eea407b"
+    },
+    {
+      "file": "explorer-element.ts",
+      "name": "mountainCardMarkup",
+      "line": 5380,
+      "sha256": "01dcb7372227c1faba8e9271794dae01eae5d1578330823f366e092c38aecd70"
+    },
+    {
+      "file": "explorer-element.ts",
+      "name": "mountainPanelMarkup",
+      "line": 5383,
+      "sha256": "4d0350716c5b328c7b7bcc7d1918b55e442e0ffc7913657a59ac107fcb16f1b3"
+    },
+    {
+      "file": "explorer-element.ts",
+      "name": "CLOUD_TRAIN_BACKGROUND_PLUGIN_ID",
+      "line": 243,
+      "sha256": "84fdda406cd9b97a3a794ad93d9e0f91f4f7bada03e14dec12b5c1ebe7341337"
+    },
+    {
+      "file": "explorer-element.ts",
+      "name": "cloudTrainCardMarkup",
+      "line": 5373,
+      "sha256": "4bab0b8d40d578e62bb5cf7788675d6c0e0354374870242f5c6591560baae9f1"
+    },
+    {
+      "file": "explorer-element.ts",
+      "name": "cloudTrainPanelMarkup",
+      "line": 5376,
+      "sha256": "169cb5a69a2033617ada2ba0dee7a4a5ef5532f0fd43955e884437f65106e797"
+    },
+    {
+      "file": "explorer-element.ts",
+      "name": "BLINKING_SQUARES_BACKGROUND_PLUGIN_ID",
+      "line": 245,
+      "sha256": "891672273ebc69b6de82f1add7b4c3784a05e01ef2b93a39d2e52d21f5d88674"
+    },
+    {
+      "file": "explorer-element.ts",
+      "name": "blinkingSquaresCardMarkup",
+      "line": 5301,
+      "sha256": "acce4fd6718d6af70982f497fea2ca1b05f9af9a59019b86090ce4df6197f690"
+    },
+    {
+      "file": "explorer-element.ts",
+      "name": "blinkingSquaresPanelMarkup",
+      "line": 5364,
+      "sha256": "072ef9e2756cab13f80cb562a1c1039dd26b19909f1d590c7617e843bb53a9a6"
+    },
+    {
+      "file": "surface-opacity.ts",
+      "name": "MASK_REGIONS",
+      "line": 4,
+      "sha256": "b028f8d24f1d10a5ed336c2500df45f727dd34238ebda6462ad360f3543fa7e6"
+    },
+    {
+      "file": "surface-opacity.ts",
+      "name": "surfaceOpacityCardMarkup",
+      "line": 15,
+      "sha256": "1bc09561a3c8b7353ee6f24623e15ac22918494895f1de684e4e2105276fc052"
+    },
+    {
+      "file": "surface-opacity.ts",
+      "name": "surfaceOpacityPanelMarkup",
+      "line": 22,
+      "sha256": "7b9372d1f2ccc7ec7133d52c96df4beef6387d7dd20073a6b714999e832a5f5a"
+    },
+    {
+      "file": "surface-opacity-runtime.ts",
+      "name": "SURFACE_OPACITY_NATIVE_CSS",
+      "line": 138,
+      "sha256": "b01d3106f8d448ab03b397123ac42cbfa9b0015c98d568150a7ce7674fc29aaa"
+    },
+    {
+      "file": "surface-opacity-runtime.ts",
+      "name": "SURFACE_OPACITY_TREE_CSS",
+      "line": 167,
+      "sha256": "9fa9dbbbd9c4dc558e6ae4c77e5b9ebd0ad608ed85761dd491619fc7e2bf055e"
+    },
+    {
+      "file": "styles.ts",
+      "name": "TREE_ROW_HEIGHT",
+      "line": 1,
+      "sha256": "f232eaa6d709b6ae023043eb6afbf041e14df364d03621672bd35bb84ab5ae4b"
+    },
+    {
+      "file": "styles.ts",
+      "name": "styles",
+      "line": 3,
+      "sha256": "8aac061c8a239e816880720d2047c8e8b718a117b1f2a2c3a5e17a0accfb4ee7"
+    }
+  ],
+  "distribution": "public core subset",
+  "excludedEffects": [
+    "aurora-ionosphere",
+    "heavenly-cloud",
+    "cloud-train",
+    "milky-way"
+  ]
+}

@@ -1,0 +1,27 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "code-codex-mac-manager",
+  "version": "1.0.0-rc.2",
+  "description": "Code-Codex Mac 单击 Dock 启动器的安装、恢复和应用内外观设置说明。",
+  "author": {
+    "name": "Code-Codex Mac contributors"
+  },
+  "license": "MIT",
+  "extensions": {
+    "com.openai": {
+      "onboardingSkill": "./skills/mac-appearance/SKILL.md",
+      "interface": {
+        "displayName": "GPT 动态背景 · Code-Codex Mac",
+        "shortDescription": "单击 Dock 启动动态背景",
+        "longDescription": "安装后点击 Dock 的 GPT 动态背景直接打开官方 GPT。原生启动器保留官方应用及签名，自动启用已保存背景，菜单栏提供设置、恢复和卸载。配套说明插件安装本身不会改变官方 GPT 图标的普通启动行为。",
+        "developerName": "Code-Codex Mac contributors",
+        "category": "Productivity",
+        "logo": "./assets/icon.svg",
+        "composerIcon": "./assets/icon.svg",
+        "defaultPrompt": [
+          "使用 Code-Codex Mac，检查管理器安装状态并说明如何恢复外观。"
+        ]
+      }
+    }
+  }
+}

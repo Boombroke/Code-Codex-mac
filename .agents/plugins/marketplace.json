@@ -1,0 +1,20 @@
+{
+  "name": "code-codex-mac-native",
+  "interface": {
+    "displayName": "Code-Codex Mac · Dock 启动器"
+  },
+  "plugins": [
+    {
+      "name": "code-codex-mac-manager",
+      "source": {
+        "source": "local",
+        "path": "./"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "name": "code-codex-mac",
+  "version": "1.0.0-rc.2",
+  "private": true,
+  "type": "module",
+  "description": "One-click native macOS Dock launcher for Code-Codex appearance",
+  "scripts": {
+    "test": "node --test test/*.test.mjs",
+    "build": "node scripts/build.mjs"
+  },
+  "engines": {
+    "node": ">=22.13"
+  }
+}

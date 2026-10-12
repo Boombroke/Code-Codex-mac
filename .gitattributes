@@ -1,0 +1,5 @@
+* text=auto eol=lf
+# Pinned upstream bytes are verified by SHA-256; never normalize their line endings.
+vendor/*.js -text
+THIRD_PARTY_NOTICES_*.md -text
+assets/*.png binary
