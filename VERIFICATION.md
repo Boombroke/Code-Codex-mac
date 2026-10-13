@@ -1,6 +1,6 @@
 # 验证与发布
 
-版本：1.0.0-rc.12。适配目标：Apple Silicon、macOS 13+、ChatGPT Desktop 的 Codex 模式。当前本机官方应用版本为 26.1007.30912；其他版本与 Chat/Work 模式未验证。
+版本：1.0.0-rc.13。适配目标：Apple Silicon、macOS 13+、ChatGPT Desktop 的 Codex 模式。当前本机官方应用版本为 26.1007.30912；其他版本与 Chat/Work 模式未验证。
 
 ## 本地已经检查
 
@@ -12,6 +12,18 @@
 - 原生应用不包含 Node/Electron 运行时或官方应用副本。
 - 已在本机安装个人八效果包并核验签名和资源哈希；原生安装与可选说明插件注册分离。卸载可清理已注册的说明插件。
 - 外部工具调用设定超时，原生安装在后台执行，避免第三方 CLI 阻塞界面。
+
+## rc.13 首页 Portal 叠色与直角
+
+用户实际截图仍有叠色和直角，因此 rc.11/rc.12 的简化 Home fixture 不能证明真实首页已适配。重新静态核对本机 26.1007.30912：HomeComposerOverlay 通过 body Portal 渲染；浮层内部有 data-floating-chat-surface=true 与 data-right-panel-composer-overlay-content=true，Home 文件栏可以是 Root 的同级节点。旧几何条件只接受 main 的 DOM 后代且只查 Root 内 rail，故漏掉此路径。官方 Root 的默认圆角为0，圆角和 corner-shape 实际定义在 Body；旧共享底板的 inherit 因此也是0。
+
+新 Portal 接管需要 fresh SurfacePolicy.validateRoot 对唯一主 main/frame 通过，同时要求精确原生锚点、唯一 Home Root 和 present 文件栏。只给局部共同父节点赋材质 scope，保留 app/frame/main/viewport、缩放、宽度和向外扩展限位，不给 body、section 或整个 fixed layer 着色。父节点原为 static 且带偏移时拒绝变更；普通 static 只建立局部定位，其他原生位置保留。关闭、隐藏/inert、主外壳失效和越界均归还租用属性与样式。
+
+共同父节点的一块伪元素承载底色和磨砂；Root、Body、文件栏及原生阴影不再另画一层。圆角取原生 composer token 或 Body computed radius。Portal 只借用主题变量，不加通用 overlay 的底色标记。尺寸和位置使用合并事件与局部 ResizeObserver；祖先动画结束才复核最终位置，不采样每个动画帧。
+
+新的 home-material 独立页面模拟 Root 内 Slot、widget 内兄弟栏以及 body Portal，Root 原生圆角为0，Body为22px，文件栏使用 present 属性与原生负 margin。对照已安装 rc.12 renderer，只将独立 localhost 测试入口的 eligibility flag 改为 preview=true，其外观代码不变：内 Slot 的 plate radius=0；兄弟栏与 Portal 的交叠 alpha=0.4375 且有重复阴影。候选三分支的 Body／文件／交叠点均为0.25、plate radius=22px、重复阴影为0；Portal 父节点无 generic overlay 标记。检查覆盖新增文件、隐藏/inert、主外壳撤销、半透明主题及恢复。
+
+这些是原版 bundle 的静态结构核验与独立 CSS/几何回归，未读取或自动重载当前 GPT 的实际 DOM，真实窗口效果仍需用户在结束当前任务后启动新版验收；双显示器验收边界继续保留。
 
 ## rc.12 透明辅助窗口与多显示器事故
 

@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.0.0-rc.13
+
+- 补齐原生首页的 body Portal 和同级文件栏结构，使用局部共同父节点绘制一次材质，交叠区仍为25%底色（75%透明度）。
+- 从原生输入区继承圆角及 corner-shape，修复 Home Root 默认圆角为0导致的直角底板；保留圆角 fallback。
+- Portal 必须绑定已验证的唯一主窗口与原生锚点，范围继续限制在 main/frame/app/viewport 内；隐藏、inert、退出和异常几何不接管。
+- Portal 只复制主题变量，不再借通用弹窗标记增加整层底色；关闭、失效及卸载恢复全部局部标记与变量。
+- 扩展独立回归到三种真实结构，并补祖先动画结束后的几何检查；没有新增逐帧 DOM 扫描或背景像素读取。
+
 ## 1.0.0-rc.12
 
 - 修复透明辅助窗口误接入预置背景的严重回归：原生入口严格核验 initialRoute，拒绝 screen-overlay、avatar-overlay、spotlight、dictation 等辅助路由。

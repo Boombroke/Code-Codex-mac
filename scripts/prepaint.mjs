@@ -10,9 +10,10 @@ export function createPrepaint(host, shellStyle, composerStyle) {
   const style=document.createElement('style');style.id='cc-mac-prepaint-style';
   const gate='data-cc-mac-prepaint';
   const scope='html['+gate+'] #root[data-cc-mac-validated-surface]';
+  const homeScope='html['+gate+']:has(#root[data-cc-mac-validated-surface]) [data-cc-mac-home-material-surface]';
   style.textContent=`
     ${scope} {isolation:isolate!important;background:var(--cc-mac-prepaint-backdrop)!important;--color-surface:transparent;--color-surface-secondary:transparent;--color-surface-tertiary:transparent;--color-surface-canvas:transparent;--color-surface-default:transparent;--color-background-surface:transparent;--color-background-surface-under:transparent;--color-background-elevated-primary:transparent;--color-background-elevated-secondary:transparent}
-    ${scope},${scope} :is(.sidebar-navigation nav[role="navigation"],.sidebar-navigation .sidebar-item,[data-user-message-bubble],[class~="group/settings"][data-density]):not([data-cc-mac-region]) {
+    ${scope},${homeScope},${scope} :is(.sidebar-navigation nav[role="navigation"],.sidebar-navigation .sidebar-item,[data-user-message-bubble],[class~="group/settings"][data-density]):not([data-cc-mac-region]) {
       --color-text:#fff;--color-text-default:#fff;--color-text-primary:#fff;--color-text-secondary:#e2e8f0;--color-text-tertiary:#e2e8f0;--color-text-user-message:#fff;--color-token-text-primary:#fff;--color-token-text-secondary:#fff;--color-token-text-tertiary:#e2e8f0;--color-token-editor-foreground:#fff;--color-token-input-foreground:#fff;--color-token-menu-foreground:#fff;--color-text-composer-primary:#fff;--color-codex-editor-cursor:#fff;--cc-mac-prepaint-ink:#fff;
       color:var(--cc-mac-prepaint-ink);text-shadow:0 1px 1px rgba(0,0,0,.7);-webkit-text-stroke:.55px rgba(0,0,0,.95);paint-order:stroke fill;
     }
@@ -22,7 +23,7 @@ export function createPrepaint(host, shellStyle, composerStyle) {
     }
   `;
   style.textContent+=(shellStyle||host.__CC_MAC_SHELL_STYLE__||(()=>''))(scope);
-  style.textContent+=(composerStyle||host.__CC_MAC_COMPOSER_STYLE__||(()=>''))([scope]);
+  style.textContent+=(composerStyle||host.__CC_MAC_COMPOSER_STYLE__||(()=>''))([scope,homeScope]);
   let active=false,disposed=false,root,previousGate,observer,latestConfig;
   const leases=new Map();
   function lease(variable,value){if(!root)return;if(!leases.has(variable))leases.set(variable,{value:root.style.getPropertyValue(variable),priority:root.style.getPropertyPriority(variable)});if(root.style.getPropertyValue(variable)!==value)root.style.setProperty(variable,value);}

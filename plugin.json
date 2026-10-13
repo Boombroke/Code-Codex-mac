@@ -1,7 +1,7 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "code-codex-mac-manager",
-  "version": "1.0.0-rc.12",
+  "version": "1.0.0-rc.13",
   "description": "Code-Codex Mac 单击 Dock 启动器的安装、恢复和应用内外观设置说明。",
   "author": {
     "name": "Code-Codex Mac contributors"

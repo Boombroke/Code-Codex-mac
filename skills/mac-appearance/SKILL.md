@@ -19,4 +19,6 @@ Use menu bar **✦ → 恢复当前窗口外观** or the in-window restore butto
 
 rc.9–rc.11 could tint transparent auxiliary windows and have a reported second-display obstruction. rc.12 filters auxiliary routes in native and document-start code and paints only a validated, viewport-bounded primary shell; Home frosting is also bounded. If a user has hit this regression, keep their recovered ordinary GPT session intact, never relaunch automatically, and distinguish independent isolation tests from physical multi-display acceptance.
 
+rc.13 also handles the native Home composer body Portal and peer file rail. Its local material requires a fresh validated primary shell, exact native anchors and bounded geometry; it shares one rounded plate at 25% tint (75% transparency). Never broaden this exception to body or an entire floating layer.
+
 This is a release candidate until actual activation is confirmed. Build, self-test and an independent renderer preview do not prove host compatibility. Keep signing and notarization status explicit when discussing public release.

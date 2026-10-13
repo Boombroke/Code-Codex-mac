@@ -19,15 +19,26 @@ class Node {
   setAttribute(key,value){this.attrs.set(key,value);}
   removeAttribute(key){this.attrs.delete(key);}
   matches(selector){
+    // Split selector lists only outside nested :is/:not and attribute values.
+    let depth=0,start=0;const parts=[];
+    for(let i=0;i<selector.length;i++){if('(['.includes(selector[i]))depth++;if(')]'.includes(selector[i]))depth--;if(selector[i]===','&&depth===0){parts.push(selector.slice(start,i));start=i+1;}}
+    if(parts.length){parts.push(selector.slice(start));return parts.some(part=>this.matches(part));}
     if(selector==='[data-cc-mac-validated-surface]')return this.attrs.has('data-cc-mac-validated-surface');
     if(selector.includes('data-composer-utility-bar-variant'))return this.kind==='home'&&this.attrs.get('data-composer-utility-bar-variant')==='home';
-    if(selector.includes('data-composer-rail-item'))return this.kind==='item';
+    if(selector==='[data-composer-body]')return this.attrs.has('data-composer-body');
+    if(selector.includes('data-composer-rail-item'))return this.kind==='item'&&this.attrs.get('data-composer-rail-item')==='present'&&this.attrs.get('data-composer-placement')==='home';
     if(selector==='[data-composer-rail]')return this.kind==='rail';
     if(selector.includes('main:is'))return this.kind==='main';
     if(selector==='#root')return this.kind==='app';
     if(selector==='[data-app-shell-frame]'||selector==='[data-app-shell-frame="true"]')return this.kind==='frame'&&this.attrs.get('data-app-shell-frame')==='true';
-    if(selector.includes('[hidden]'))return this.attrs.has('hidden')||this.attrs.get('aria-hidden')==='true'||this.attrs.get('data-app-shell-active-page')==='false';
-    if(selector.startsWith('button,a,'))return this.kind==='popup'||this.kind==='button';
+    for(const attr of ['data-floating-chat-surface','data-right-panel-composer-overlay-content'])if(selector===`[${attr}="true"]`)return this.attrs.get(attr)==='true';
+    if(selector==='[data-codex-composer-root]')return this.attrs.has('data-codex-composer-root');
+    if(selector==='[hidden]'||selector==='[inert]')return this.attrs.has(selector.slice(1,-1));
+    if(selector==='[aria-hidden="true"]')return this.attrs.get('aria-hidden')==='true';
+    if(selector==='[data-app-shell-active-page="false"]')return this.attrs.get('data-app-shell-active-page')==='false';
+    if(selector==='button'||selector==='a')return this.kind===selector;
+    if(selector.startsWith('[role="'))return this.attrs.get('role')===selector.slice(7,-2)||this.kind==='popup'&&selector==='[role="menu"]';
+    if(selector==='[data-composer-overlay-floating-ui]')return this.attrs.has('data-composer-overlay-floating-ui');
     return false;
   }
   closest(selector){for(let n=this;n;n=n.parentElement)if(n.matches(selector))return n;return null;}
@@ -38,14 +49,15 @@ class Node {
 }
 function fixture(){
   const allObservers=[],resizeObservers=[],microtasks=[],listeners=new Map();
-  const document=new Node('document'),app=new Node('app',{top:0,right:1000,bottom:700,left:0}),frame=new Node('frame'),main=new Node('main',{top:40,right:950,bottom:660,left:150}),home=new Node('home',{top:100,right:500,bottom:300,left:200});
+  const document=new Node('document'),app=new Node('app',{top:0,right:1000,bottom:700,left:0}),frame=new Node('frame',{top:0,right:1000,bottom:700,left:0}),main=new Node('main',{top:40,right:950,bottom:660,left:150}),home=new Node('home',{top:100,right:500,bottom:300,left:200});
   app.setAttribute('data-cc-mac-validated-surface','');frame.setAttribute('data-app-shell-frame','true');
   home.setAttribute('data-composer-utility-bar-variant','home');document.append(app);app.append(frame);frame.append(main);main.append(home);
   const slot=new Node('slot'),rail=new Node('rail',{top:64,right:508,bottom:124,left:192}),item=new Node('item',{top:64,right:508,bottom:104,left:192});
-  home.append(slot);slot.append(rail);rail.append(item);
-  const bodyWrapper=new Node('body-wrapper'),body=new Node('body');home.append(bodyWrapper);bodyWrapper.append(body);
+  item.setAttribute('data-composer-rail-item','present');item.setAttribute('data-composer-placement','home');home.append(slot);slot.append(rail);rail.append(item);
+  const bodyWrapper=new Node('body-wrapper'),body=new Node('body');body.setAttribute('data-composer-body','');home.append(bodyWrapper);bodyWrapper.append(body);
   document.addEventListener=(name,fn)=>listeners.set(name,fn);document.removeEventListener=name=>listeners.delete(name);
-  const host={document,innerWidth:1000,innerHeight:700,queueMicrotask:fn=>microtasks.push(fn),getComputedStyle:node=>({display:node.style.getPropertyValue('display')||'block',visibility:node.style.getPropertyValue('visibility')||'visible',opacity:node.style.getPropertyValue('opacity')||'1'}),addEventListener:(name,fn)=>listeners.set(name,fn),removeEventListener:name=>listeners.delete(name),MutationObserver:class{constructor(fn){this.fn=fn;allObservers.push(this);}observe(){this.connected=true;}disconnect(){this.connected=false;}},ResizeObserver:class{nodes=new Set();constructor(fn){this.fn=fn;resizeObservers.push(this);}observe(node){this.nodes.add(node);}unobserve(node){this.nodes.delete(node);}disconnect(){this.nodes.clear();this.disconnected=true;}}};
+  const host={document,innerWidth:1000,innerHeight:700,queueMicrotask:fn=>microtasks.push(fn),getComputedStyle:node=>({display:node.style.getPropertyValue('display')||'block',visibility:node.style.getPropertyValue('visibility')||'visible',opacity:node.style.getPropertyValue('opacity')||'1',position:node.style.getPropertyValue('position')||(node.kind==='home'?'relative':'static'),top:node.style.getPropertyValue('top')||'auto',right:node.style.getPropertyValue('right')||'auto',bottom:node.style.getPropertyValue('bottom')||'auto',left:node.style.getPropertyValue('left')||'auto',borderRadius:node.kind==='body'?'22px':'0px',cornerShape:'round',getPropertyValue:key=>node.style.getPropertyValue(key)}),addEventListener:(name,fn)=>listeners.set(name,fn),removeEventListener:name=>listeners.delete(name),MutationObserver:class{constructor(fn){this.fn=fn;allObservers.push(this);}observe(){this.connected=true;}disconnect(){this.connected=false;}},ResizeObserver:class{nodes=new Set();constructor(fn){this.fn=fn;resizeObservers.push(this);}observe(node){this.nodes.add(node);}unobserve(node){this.nodes.delete(node);}disconnect(){this.nodes.clear();this.disconnected=true;}}};
+  host.__CC_MAC_SURFACE_POLICY__={validateRoot:(a,m)=>host.primaryAllowed!==false&&a===app&&m===main&&frame.kind==='frame'&&frame.getAttribute('data-app-shell-frame')==='true'&&app.contains(main)};
   return {host,home,rail,item,slot,body,main,app,frame,document,allObservers,resizeObservers,listeners,flush(){while(microtasks.length)microtasks.shift()();}};
 }
 const insets=node=>Object.fromEntries(['top','right','bottom','left'].map(edge=>[edge,node.style.getPropertyValue('--cc-home-material-'+edge)]));
@@ -149,4 +161,98 @@ test('a stale validated marker on an oversized viewport surface cannot bypass Ho
   const f=fixture(),api=createHomeMaterial(f.host);api.update(true);
   f.app.rect={left:0,top:0,right:2000,bottom:1500};f.main.rect={left:150,top:40,right:1900,bottom:1400};api.refresh();
   assert.equal(f.home.getAttribute('data-cc-mac-home-material-owner'),null);assert.deepEqual(insets(f.home),{top:'',right:'',bottom:'',left:''});api.dispose();
+});
+
+function peerFixture({portal=true}={}){
+  const f=fixture(),owner=new Node('owner',{top:64,right:508,bottom:300,left:192});
+  f.home.children=f.home.children.filter(node=>node!==f.slot);f.slot.children=[];
+  f.main.children=f.main.children.filter(node=>node!==f.home);owner.append(f.rail);owner.append(f.home);
+  if(portal){
+    const body=new Node('page-body'),layer=new Node('layer'),section=new Node('section'),floating=new Node('floating'),content=new Node('content');
+    section.setAttribute('role','region');section.setAttribute('data-state','open');floating.setAttribute('data-floating-chat-surface','true');content.setAttribute('data-right-panel-composer-overlay-content','true');
+    f.document.children=[];f.document.append(body);body.append(f.app);body.append(layer);layer.append(section);section.append(floating);floating.append(content);content.append(owner);f.document.body=body;
+    Object.assign(f,{pageBody:body,layer,section,floating,content});
+  }else{owner.setAttribute('data-codex-composer-root','');f.main.append(owner);}
+  f.owner=owner;return f;
+}
+
+test('real body Portal peers use only their small common parent and Body radius, never the full layer',()=>{
+  const f=peerFixture(),api=createHomeMaterial(f.host);api.update(true);
+  assert.equal(f.owner.getAttribute('data-cc-mac-home-material-owner'),'');assert.equal(f.owner.getAttribute('data-cc-mac-home-material-surface'),'');
+  assert.equal(f.home.getAttribute('data-cc-mac-home-material-owner'),null);
+  assert.equal(f.owner.style.getPropertyValue('--cc-home-material-radius'),'22px','native Root has zero radius while wrapped Body supplies 22px');
+  assert.equal(f.owner.style.getPropertyValue('position'),'relative');assert.equal(f.owner.style.getPropertyValue('isolation'),'isolate');
+  assert.deepEqual(insets(f.owner),{top:'0px',right:'0px',bottom:'0px',left:'0px'});
+  for(const node of [f.pageBody,f.layer,f.section,f.floating,f.content,f.app,f.main])assert.equal(node.getAttribute('data-cc-mac-home-material-owner'),null);
+  f.rail.rect={top:276,right:508,bottom:338,left:192};f.item.rect={top:300,right:508,bottom:338,left:192};api.refresh();assert.equal(insets(f.owner).bottom,'-38px');api.dispose();
+});
+
+test('a native widget inside the main supports peer rails without granting a Portal scope',()=>{
+  const f=peerFixture({portal:false}),api=createHomeMaterial(f.host);api.update(true);
+  assert.equal(f.owner.getAttribute('data-cc-mac-home-material-owner'),'');assert.equal(f.owner.getAttribute('data-cc-mac-home-material-surface'),null);
+  assert.equal(f.home.getAttribute('data-cc-mac-home-material-owner'),null);api.dispose();
+});
+
+test('Portal leases restore every attribute, priority and positioned-owner style on revoke or disable',()=>{
+  for(const mode of ['revoke','disabled','removed','failed','dispose']){
+    const f=peerFixture();f.owner.style.setProperty('isolation','auto','important');f.owner.style.setProperty('--cc-home-material-radius','9px','important');f.home.style.setProperty('--composer-border-radius','28px');f.home.style.setProperty('--composer-corner-shape','squircle');
+    const api=createHomeMaterial(f.host);api.update(true);assert.equal(f.owner.style.getPropertyValue('--cc-home-material-radius'),'28px');assert.equal(f.owner.style.getPropertyValue('--cc-home-material-corner-shape'),'squircle');
+    if(mode==='revoke'){f.app.removeAttribute('data-cc-mac-validated-surface');f.allObservers[0].fn([{type:'attributes',attributeName:'data-cc-mac-validated-surface',target:f.app}]);f.flush();}
+    else if(mode==='dispose')api.dispose();else api.update(mode==='disabled'?false:{enabled:true,[mode==='removed'?'removed':'renderFailed']:true});
+    assert.equal(f.owner.getAttribute('data-cc-mac-home-material-owner'),null);assert.equal(f.owner.getAttribute('data-cc-mac-home-material-surface'),null);
+    assert.equal(f.owner.style.getPropertyValue('position'),'');assert.equal(f.owner.style.getPropertyValue('isolation'),'auto');assert.equal(f.owner.style.getPropertyPriority('isolation'),'important');
+    assert.equal(f.owner.style.getPropertyValue('--cc-home-material-radius'),'9px');assert.equal(f.owner.style.getPropertyPriority('--cc-home-material-radius'),'important');
+    assert.equal(f.owner.style.getPropertyValue('--cc-home-material-corner-shape'),'');assert.deepEqual(insets(f.owner),{top:'',right:'',bottom:'',left:''});api.dispose();
+  }
+});
+
+test('Portal needs live primary authentication, both exact native anchors, and unambiguous Home ownership',()=>{
+  for(const corrupt of [f=>f.host.primaryAllowed=false,f=>delete f.host.__CC_MAC_SURFACE_POLICY__,f=>f.content.removeAttribute('data-right-panel-composer-overlay-content'),f=>f.floating.removeAttribute('data-floating-chat-surface'),f=>f.app.removeAttribute('data-cc-mac-validated-surface'),f=>{const second=new Node('home',f.home.rect);second.setAttribute('data-composer-utility-bar-variant','home');f.owner.append(second);}]){
+    const f=peerFixture();corrupt(f);const api=createHomeMaterial(f.host);api.update(true);assert.equal(f.owner.getAttribute('data-cc-mac-home-material-owner'),null);assert.equal(f.owner.getAttribute('data-cc-mac-home-material-surface'),null);api.dispose();
+  }
+});
+
+test('Portal controls, hidden or exiting branches and inert ancestors never receive material markers',()=>{
+  for(const corrupt of [f=>f.section.setAttribute('role','dialog'),f=>f.owner.setAttribute('role','button'),f=>f.floating.setAttribute('inert',''),f=>f.floating.setAttribute('aria-hidden','true'),f=>f.content.style.setProperty('display','none'),f=>f.owner.setAttribute('data-composer-overlay-floating-ui','')]){
+    const f=peerFixture(),api=createHomeMaterial(f.host);api.update(true);corrupt(f);api.refresh();assert.equal(f.owner.getAttribute('data-cc-mac-home-material-owner'),null);assert.equal(f.owner.getAttribute('data-cc-mac-home-material-surface'),null);api.dispose();
+  }
+  const f=peerFixture(),api=createHomeMaterial(f.host);f.item.setAttribute('data-composer-rail-item','exiting');api.update(true);assert.equal(f.owner.getAttribute('data-cc-mac-home-material-owner'),null);api.dispose();
+});
+
+test('peer owner respects unchanged bounded geometry and cannot activate native static offsets',()=>{
+  for(const corrupt of [f=>f.owner.rect={left:0,top:0,right:1000,bottom:700},f=>f.rail.rect={left:192,top:-3000,right:508,bottom:124},f=>f.item.rect={left:0,top:64,right:508,bottom:104},f=>f.home.offsetWidth=300*.249,f=>f.owner.offsetWidth=316*4.001,f=>f.owner.style.setProperty('left','12px')]){
+    const f=peerFixture();corrupt(f);const api=createHomeMaterial(f.host);api.update(true);assert.equal(f.owner.getAttribute('data-cc-mac-home-material-owner'),null);assert.equal(f.owner.getAttribute('data-cc-mac-home-material-surface'),null);api.dispose();
+  }
+  const f=peerFixture();f.owner.style.setProperty('position','absolute','important');f.owner.style.setProperty('left','192px');const api=createHomeMaterial(f.host);api.update(true);
+  assert.equal(f.owner.getAttribute('data-cc-mac-home-material-owner'),'');assert.equal(f.owner.style.getPropertyValue('position'),'absolute');assert.equal(f.owner.style.getPropertyPriority('position'),'important');api.dispose();
+});
+
+test('Portal observer coalesces resize and ignores its own marker and geometry leases',()=>{
+  const f=peerFixture(),api=createHomeMaterial(f.host);api.update(true);const reads=f.home.reads,ro=f.resizeObservers[0];
+  assert(ro.nodes.has(f.owner)&&ro.nodes.has(f.home)&&ro.nodes.has(f.rail));
+  f.allObservers[0].fn([{type:'attributes',attributeName:'data-cc-mac-home-material-surface',target:f.owner},{type:'attributes',attributeName:'style',target:f.owner}]);f.flush();assert.equal(f.home.reads,reads);
+  ro.fn();ro.fn();f.flush();assert.equal(f.home.reads,reads+1);api.dispose();assert(ro.disconnected);
+});
+
+
+test('nested Home roots and distinct Home branches in one native Portal content fail closed',()=>{
+  for(const nested of [false,true]){
+    const f=peerFixture(),second=new Node('home',f.home.rect);second.setAttribute('data-composer-utility-bar-variant','home');
+    if(nested)f.home.append(second);else{const branch=new Node('branch',f.owner.rect);f.content.append(branch);branch.append(second);}
+    const api=createHomeMaterial(f.host);api.update(true);assert.equal(f.owner.getAttribute('data-cc-mac-home-material-owner'),null);assert.equal(f.home.getAttribute('data-cc-mac-home-material-owner'),null);api.dispose();
+  }
+});
+
+
+test('ancestor motion settles refresh the final Portal pose without per-frame transform scans',()=>{
+  const f=peerFixture(),api=createHomeMaterial(f.host);api.update(true);const initialReads=f.home.reads;
+  // A translate changes position, but not ResizeObserver's content-box size.
+  f.floating.style.setProperty('transform','translateY(-100px)');f.owner.rect={left:192,top:-36,right:508,bottom:200};f.home.rect={left:200,top:0,right:500,bottom:200};f.rail.rect={left:192,top:-36,right:508,bottom:24};f.item.rect={left:192,top:-36,right:508,bottom:4};
+  f.allObservers[0].fn([{type:'attributes',attributeName:'style',target:f.floating}]);f.flush();assert.equal(f.home.reads,initialReads,'intermediate transforms do not trigger geometry polling');
+  f.listeners.get('transitionend')({target:f.floating});f.flush();assert.equal(f.owner.getAttribute('data-cc-mac-home-material-owner'),null);assert.equal(f.owner.getAttribute('data-cc-mac-home-material-surface'),null);
+  const rejectedReads=f.home.reads;assert(f.resizeObservers[0].nodes.has(f.owner),'bounded native candidate remains tracked even while its final pose is rejected');
+  f.owner.rect={left:192,top:64,right:508,bottom:300};f.home.rect={left:200,top:100,right:500,bottom:300};f.rail.rect={left:192,top:64,right:508,bottom:124};f.item.rect={left:192,top:64,right:508,bottom:104};
+  f.listeners.get('animationend')({target:f.section});f.flush();assert.equal(f.home.reads,rejectedReads+1);assert.equal(f.owner.getAttribute('data-cc-mac-home-material-owner'),'');assert.equal(f.owner.getAttribute('data-cc-mac-home-material-surface'),'');
+  const restoredReads=f.home.reads,unrelated=new Node('unrelated');f.listeners.get('animationend')({target:unrelated});f.listeners.get('animationend')({target:f.pageBody});f.flush();assert.equal(f.home.reads,restoredReads,'unrelated or whole-body events do not scan the document');
+  api.dispose();
 });

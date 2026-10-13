@@ -151,7 +151,7 @@
     [data-cc-mac-background-surface][data-cc-mac-validated-surface][data-cc-mac-active] [data-cc-mac-region="settings-control"][class~="bg-text/5"] {background-color:var(--cc-settings-control-surface)!important}
   `;
   style.textContent+=window.__CC_MAC_SHELL_STYLE__('[data-cc-mac-background-surface][data-cc-mac-validated-surface][data-cc-mac-active]');
-  style.textContent+=window.__CC_MAC_COMPOSER_STYLE__(['[data-cc-mac-background-surface][data-cc-mac-validated-surface][data-cc-mac-active]']);
+  style.textContent+=window.__CC_MAC_COMPOSER_STYLE__(['[data-cc-mac-background-surface][data-cc-mac-validated-surface][data-cc-mac-active]','html:has(#root[data-cc-mac-background-surface][data-cc-mac-validated-surface][data-cc-mac-active]) [data-cc-mac-home-material-surface]']);
   document.head.append(style);
   const controls=document.createElement('div');
   controls.id='cc-mac-background-controls';
@@ -238,14 +238,14 @@
   function removeOverlay(node) {
     const entry=overlays.get(node);if(!entry)return;
     resizeObserver.unobserve(node);
-    if(entry.attribute===null)node.removeAttribute('data-cc-mac-overlay');else node.setAttribute('data-cc-mac-overlay',entry.attribute);
+    if(!entry.themeOnly){if(entry.attribute===null)node.removeAttribute('data-cc-mac-overlay');else node.setAttribute('data-cc-mac-overlay',entry.attribute);}
     restoreThemeVars(node);overlays.delete(node);
   }
   function clearOverlays() {for(const node of [...overlays.keys()])removeOverlay(node);}
   function syncOverlays() {
     if(!surface||!config.enabled||renderFailed){clearOverlays();return;}
     const scope=surface.getBoundingClientRect();backgroundBounds=background.getBoundingClientRect();
-    const candidates=[...document.querySelectorAll('[role="dialog"],[role="menu"],[role="listbox"],[role="tooltip"],[data-composer-overlay-floating-ui]')];
+    const candidates=[...document.querySelectorAll('[role="dialog"],[role="menu"],[role="listbox"],[role="tooltip"],[data-composer-overlay-floating-ui],[data-cc-mac-home-material-surface]')];
     candidates.push(...(ui?.overlays()||[]));
     const active=new Set(candidates.filter(node=>{
       const r=node.getBoundingClientRect(),css=getComputedStyle(node);
@@ -254,9 +254,11 @@
     for(const node of [...overlays.keys()])if(!active.has(node))removeOverlay(node);
     let redraw=false;
     for(const node of active) {
+      const themeOnly=node.hasAttribute('data-cc-mac-home-material-surface');
+      if(overlays.has(node)&&overlays.get(node).themeOnly!==themeOnly)removeOverlay(node);
       if(!overlays.has(node)) {
-        const entry={attribute:node.getAttribute('data-cc-mac-overlay')};
-        overlays.set(node,entry);node.setAttribute('data-cc-mac-overlay','');resizeObserver.observe(node);
+        const entry={attribute:node.getAttribute('data-cc-mac-overlay'),themeOnly};
+        overlays.set(node,entry);if(!themeOnly)node.setAttribute('data-cc-mac-overlay','');resizeObserver.observe(node);
         redraw=true;
       }
       applyThemeVars(node);
@@ -369,7 +371,7 @@
   },abort.signal);
   function diagnostics() {
     const rect=surface?.getBoundingClientRect();
-    const report={version:'1.0.0-rc.12',upstream:catalog.commit,effect:config.effect,enabled:config.enabled,paused:config.paused||settings().paused,visibility:document.visibilityState,reduceMotion:reduced.matches,frameCallbacks:frameRuntime?.frameCount,performance:policy,resolvedTone,foreground:'fixed-white-outline',backgroundReadback:false,frameStats:frameRuntime?.stats,popupRendering:'css',regions:JSON.parse(background.dataset.regions||'{}'),scope:surface?{tag:surface.tagName,id:surface.id,width:rect.width,height:rect.height}:null,canvas:canvas?{width:canvas.width,height:canvas.height,cssWidth:canvas.clientWidth,cssHeight:canvas.clientHeight,dpr:devicePixelRatio}:null,blur:config.blur,transparency:config.transparency,opacity:config.opacity,backgroundOpacity:config.backgroundOpacity,composerTransparency:config.composerTransparency,codeStyle:config.codeStyle,codeTransparency:config.codeTransparency};
+    const report={version:'1.0.0-rc.13',upstream:catalog.commit,effect:config.effect,enabled:config.enabled,paused:config.paused||settings().paused,visibility:document.visibilityState,reduceMotion:reduced.matches,frameCallbacks:frameRuntime?.frameCount,performance:policy,resolvedTone,foreground:'fixed-white-outline',backgroundReadback:false,frameStats:frameRuntime?.stats,popupRendering:'css',regions:JSON.parse(background.dataset.regions||'{}'),scope:surface?{tag:surface.tagName,id:surface.id,width:rect.width,height:rect.height}:null,canvas:canvas?{width:canvas.width,height:canvas.height,cssWidth:canvas.clientWidth,cssHeight:canvas.clientHeight,dpr:devicePixelRatio}:null,blur:config.blur,transparency:config.transparency,opacity:config.opacity,backgroundOpacity:config.backgroundOpacity,composerTransparency:config.composerTransparency,codeStyle:config.codeStyle,codeTransparency:config.codeTransparency};
     if(!navigator.clipboard?.writeText){status('当前应用未提供剪贴板接口');return;}
     void navigator.clipboard.writeText(JSON.stringify(report,null,2)).then(()=>status('诊断已复制（不含聊天内容）')).catch(()=>status('复制失败，请检查剪贴板权限'));
   }
@@ -382,7 +384,7 @@
   const structuralSelector=mainSelector+', [data-app-shell-frame],[data-app-shell-active-page],'+sidebarSelector+', '+navigationSelector+', [data-app-shell-titlebar],[data-app-shell-page-header],[data-composer-layout],[data-composer-surface-variant]';
   const panelSelector='.bg-surface,.bg-surface-secondary,.bg-surface-tertiary,.bg-token-main-surface-primary,.bg-token-bg-primary,.bg-token-bg-secondary,.bg-background-surface,.bg-background-surface-under,.bg-background-elevated-primary,.bg-background-elevated-secondary,[class*="PanelSurface"],[class*="CardSurface"]';
   const regionSelector=codeSelector+', '+structuralSelector+', '+sidebarItemSelector+', '+bubbleSelector+', '+panelSelector+', '+settingsRootSelector+', '+settingsPanelSelector+', '+settingsRowSelector+', '+settingsControlSelector;
-  const overlaySelector='[role="dialog"],[role="menu"],[role="listbox"],[role="tooltip"],[data-composer-overlay-floating-ui]';
+  const overlaySelector='[role="dialog"],[role="menu"],[role="listbox"],[role="tooltip"],[data-composer-overlay-floating-ui],[data-cc-mac-home-material-surface]';
   const relevant=(node,selector)=>node instanceof Element&&(node.matches(selector)||!!node.querySelector(selector));
   const layoutObserver=new MutationObserver(records=>{
     for(const record of records){
@@ -395,8 +397,8 @@
         if(target.matches(regionSelector)||regions.has(target))regionsDirty=true;
         if(target.matches(structuralSelector)){regionsDirty=true;geometryDirty=true;surfaceDirty=true;}
         if(config.enabled&&!renderFailed&&target.matches('main,[class*="FullHeightPageSurfaceLayout"],[class*="MainContentSurface"],.messaging-root,.thread-pane'))for(const animation of target.getAnimations())if(['background-color','background-image'].includes(animation.transitionProperty))animation.cancel();
-        if(target.matches(overlaySelector)||target.closest(overlaySelector)){overlaysDirty=true;}
-        if(['data-app-shell-active-page','data-app-shell-frame','data-app-shell-main-surface','data-cc-mac-validated-surface','hidden','aria-hidden'].includes(record.attributeName)&&relevant(target,mainSelector))surfaceDirty=true;
+        if(target.matches(overlaySelector)||target.closest(overlaySelector)||overlays.has(target)){overlaysDirty=true;}
+        if(['data-app-shell-active-page','data-app-shell-frame','data-app-shell-main-surface','data-cc-mac-validated-surface','data-cc-mac-home-material-surface','hidden','aria-hidden'].includes(record.attributeName)&&relevant(target,mainSelector))surfaceDirty=true;
       }else{
         for(const node of [...record.addedNodes,...record.removedNodes]){
           if(!(node instanceof Element)||node.matches('#cc-mac-background,#cc-mac-background-controls,[data-cc-mac-popup-mirror]'))continue;
@@ -417,7 +419,7 @@
     }
     if(surfaceDirty||regionsDirty||geometryDirty||overlaysDirty)scheduleReconcile();
   });
-  layoutObserver.observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:['data-app-shell-active-page','data-app-shell-frame','data-app-shell-main-surface','data-cc-mac-validated-surface','hidden','aria-hidden','class','style','role','open','data-state','data-theme','data-density','data-app-shell-left-panel-appearance','data-user-message-bubble','data-message-role','data-message-id','data-markdown-text-tone','data-thread-title','data-thread-title-trigger','data-thread-secondary-title']});
+  layoutObserver.observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:['data-app-shell-active-page','data-app-shell-frame','data-app-shell-main-surface','data-cc-mac-validated-surface','data-cc-mac-home-material-surface','hidden','aria-hidden','class','style','role','open','data-state','data-theme','data-density','data-app-shell-left-panel-appearance','data-user-message-bubble','data-message-role','data-message-id','data-markdown-text-tone','data-thread-title','data-thread-title-trigger','data-thread-secondary-title']});
   const resizeObserver=new ResizeObserver(entries=>{if(entries.some(entry=>entry.target===surface))surfaceDirty=true;geometryDirty=true;overlaysDirty=true;scheduleReconcile();});
   function applyRenderPolicy(){
     const bounds=surface?.getBoundingClientRect();
@@ -533,6 +535,6 @@
   for(const target of [document,shadow])target.addEventListener('animationend',event=>{if(event.target instanceof Element&&event.target.matches(overlaySelector)){overlaysDirty=true;scheduleReconcile();}},{capture:true,signal:abort.signal});
   function dispose() {if(disposed)return;disposed=true;ui?.close();abort.abort();themeObserver.disconnect();layoutObserver.disconnect();cancelAnimationFrame(reconcileFrame);clearTimeout(reconcileTimer);detachSurface();for(const node of [...themeLeases.keys()])restoreThemeVars(node);frameRuntime?.dispose();style.remove();window.__CCMacPrepaint__?.dispose();delete window[API];}
   function revokeSurface(root){if(disposed||surface!==root)return;detachSurface();surfaceDirty=regionsDirty=geometryDirty=overlaysDirty=true;scheduleReconcile();}
-  window[API]=Object.freeze({version:'1.0.0-rc.12',dispose,revokeSurface});
+  window[API]=Object.freeze({version:'1.0.0-rc.13',dispose,revokeSurface});
   reconcile();persist();
 })();
