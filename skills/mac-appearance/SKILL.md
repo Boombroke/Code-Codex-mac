@@ -21,4 +21,6 @@ rc.9–rc.11 could tint transparent auxiliary windows and have a reported second
 
 rc.13 also handles the native Home composer body Portal and peer file rail. Its local material requires a fresh validated primary shell, exact native anchors and bounded geometry; it shares one rounded plate at 25% tint (75% transparency). Never broaden this exception to body or an entire floating layer.
 
+rc.14 supplies the launcher microphone usage description required by macOS when microphone access from its GPT child is attributed to this responsible app. Missing descriptions in earlier packages caused confirmed TCC aborts. Updates do not request, grant or reset microphone permission; the user decides when activating voice. Do not trigger recording or a privacy prompt to test the current GPT session.
+
 This is a release candidate until actual activation is confirmed. Build, self-test and an independent renderer preview do not prove host compatibility. Keep signing and notarization status explicit when discussing public release.

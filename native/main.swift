@@ -43,6 +43,10 @@ if let value = CommandLine.arguments.first(where: { $0.hasPrefix("--finish-updat
     dispatchMain()
 } else if CommandLine.arguments.contains("--self-test") {
     precondition(buildVersion != "development")
+    guard let microphoneUsage = Bundle.main.object(forInfoDictionaryKey: "NSMicrophoneUsageDescription") as? String,
+          !microphoneUsage.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+        fputs("Packaged launcher is missing its microphone usage description.\n", stderr); exit(1)
+    }
     launchPolicySelfTest()
     do { try installIdentitySelfTest(); try installationRollbackSelfTest() } catch { fputs("Update self-test failed: \(error)\n", stderr); exit(1) }
     do { try DockEntry.selfTest() } catch { fputs("Dock model self-test failed: \(error)\n", stderr); exit(1) }

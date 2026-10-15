@@ -1,6 +1,6 @@
 # 验证与发布
 
-版本：1.0.0-rc.13。适配目标：Apple Silicon、macOS 13+、ChatGPT Desktop 的 Codex 模式。当前本机官方应用版本为 26.1007.30912；其他版本与 Chat/Work 模式未验证。
+版本：1.0.0-rc.14。适配目标：Apple Silicon、macOS 13+、ChatGPT Desktop 的 Codex 模式。当前本机官方应用版本为 26.1007.30912；其他版本与 Chat/Work 模式未验证。
 
 ## 本地已经检查
 
@@ -12,6 +12,14 @@
 - 原生应用不包含 Node/Electron 运行时或官方应用副本。
 - 已在本机安装个人八效果包并核验签名和资源哈希；原生安装与可选说明插件注册分离。卸载可清理已注册的说明插件。
 - 外部工具调用设定超时，原生安装在后台执行，避免第三方 CLI 阻塞界面。
+
+## rc.14 语音触发 TCC 终止
+
+本机两份最新 ChatGPT 崩溃报告（2026-10-15 11:23、11:28，Asia/Shanghai）均显示 SIGABRT，termination namespace=TCC，原因明确为缺少 NSMicrophoneUsageDescription。parent/responsible process 均为 Code-Codex Mac；原版 ChatGPT 已有此键，rc.13 启动器实际安装包没有。直接启动官方可用与这一责任归属差异一致。未将用户含糊描述的“自动补全输出”擅自认定为文本候选列表；已记录的两次崩溃均为麦克风用途说明问题。
+
+[Apple 的 macOS 媒体授权文档](https://developer.apple.com/documentation/bundleresources/requesting-authorization-for-media-capture-on-macos)说明缺少用途声明会导致系统终止。本次只给启动器添加非空麦克风用途文案，未修改官方应用、现有启动架构、TCC 数据库或授权状态。当前管理器是无 Hardened Runtime 的 ad-hoc 构建；官方 GPT 自身已有 audio-input entitlement，此修复不额外添加 entitlement。
+
+构建时 --self-test 读取实际 Bundle.main 的用途说明并拒绝空值；公开与个人包均经过此检查。签名／归档／安装后再读各自的 Info.plist 核验，原版 GPT 签名与文件哈希保持原样。没有自动打开语音、录音、操作系统权限对话框或关闭当前 GPT；本次不能据此宣称真实麦克风录音已通过。首次语音授权仍由使用者选择。
 
 ## rc.13 首页 Portal 叠色与直角
 
