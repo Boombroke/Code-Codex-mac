@@ -32,7 +32,7 @@
   config.opacity=clearConversationMasks(config.opacity);
   if(!config.materialVersion){config.composerTransparency=75;config.codeTransparency=60;config.codeStyle='frosted';config.materialVersion=1;}
   config.opacity.composer=100-config.composerTransparency;
-  let renderer, canvas, media, mediaURL, mediaFile, disposed=false, mountRevision=0;
+  let renderer,rendererMount,rendererUpdating=false,canvas,media,mediaURL,mediaFile,displayedMediaFile,disposed=false,mountRevision=0,mediaSelectionRevision=0,mediaPlayRevision=0;
   let surface, contentSurface, positionLease, reconcileFrame=0,reconcileTimer,renderFailed=false;
   let surfaceDirty=true,regionsDirty=true,geometryDirty=true,overlaysDirty=true,backgroundBounds;
   let lastCounterUpdate=0,policy;
@@ -157,7 +157,7 @@
   controls.id='cc-mac-background-controls';
   const shadow=controls.attachShadow({mode:'open'});
   function persist() { try {localStorage.setItem(ownKey,JSON.stringify(config));} catch {status('设置存储失败，请检查本机可用空间');} }
-  function status(message) { if(background.dataset.status===message)return;background.dataset.status=message;ui?.render(); }
+  function status(message) { if(disposed||background.dataset.status===message)return;background.dataset.status=message;ui?.render(); }
   function settings(id=config.effect) {
     const effect=catalog.effects.find(e=>e.id===id);
     return effect?{...structuredClone(effect.defaults),...config.settings[effect.id]}:{};
@@ -265,81 +265,142 @@
     }
     if(redraw){frameRuntime?.invalidate();refreshMotion();}
   }
-  function releaseRenderer() {
-    renderer?.dispose(); renderer=undefined;
-    for(const effect of catalog.effects)registrations?.delete(effect.id);
-    media?.pause?.(); media?.removeAttribute('src'); media=undefined;
-    if(mediaURL)URL.revokeObjectURL(mediaURL); mediaURL=undefined;
-    layer.replaceChildren(); canvas=undefined;
+  function rendererFailure(error,owner=rendererMount) {
+    if(disposed||!owner||rendererMount!==owner||owner.revision!==mountRevision)return;
+    ++mountRevision;releaseRenderer();renderFailed=true;
+    applyPresentation();refreshMotion();
+    status('背景已停止，已恢复原生外观：'+(error?.message||String(error)));
   }
-  async function setMedia(file,save=true) {
+  function invokeRenderer(callback) {
+    const current=renderer,owner=rendererMount;if(!current||!owner||disposed)return false;
+    try{callback(current);return renderer===current&&rendererMount===owner;}
+    catch(error){rendererFailure(error,owner);return false;}
+  }
+  function replayRenderer() {
+    if(disposed)return;frameRuntime?.invalidate();
+    if(renderer?.replay)invokeRenderer(current=>current.replay());else mount();
+  }
+  function releaseRenderer() {
+    const previous=renderer,previousOwner=rendererMount,previousMedia=media,previousURL=mediaURL;
+    // Revoke callback ownership before teardown: a disposed vendor must never
+    // report a late failure against the replacement renderer.
+    renderer=rendererMount=media=mediaURL=displayedMediaFile=undefined;++mediaPlayRevision;
+    if(frameRuntime)frameRuntime.onError=undefined;
+    let failure;const clean=callback=>{try{callback();}catch(error){failure??=error;}};
+    clean(()=>frameRuntime?.cancelOwner?.(previousOwner?.frameErrorHandler));
+    clean(()=>previous?.dispose());
+    for(const effect of catalog.effects)clean(()=>registrations?.delete(effect.id));
+    clean(()=>previousMedia?.pause?.());clean(()=>previousMedia?.removeAttribute('src'));
+    if(previousURL)clean(()=>URL.revokeObjectURL(previousURL));
+    clean(()=>layer.replaceChildren());canvas=undefined;return failure;
+  }
+  function mediaCurrent(selection,file) {
+    return !disposed&&selection===mediaSelectionRevision&&(!file||mediaFile===file);
+  }
+  async function setMedia(file,save=true,selection=save?++mediaSelectionRevision:mediaSelectionRevision) {
+    if(!mediaCurrent(selection))return false;
     if(!/^(image\/(png|jpeg|webp|gif)|video\/(mp4|webm))$/.test(file.type))throw Error('请选择 PNG、JPEG、WebP、GIF、MP4 或 WebM');
     if(file.size>64*1024*1024)throw Error('媒体文件超过 64 MiB');
-    mediaFile=file;
+    if(save||!mediaFile)mediaFile=file;
+    if(!mediaCurrent(selection,file))return false;
     if(save) {
-      const db=await mediaDB();
-      await new Promise((resolve,reject)=>{const tx=db.transaction('media','readwrite');tx.objectStore('media').put(file,'current');tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error||Error('媒体保存中断'));});
-      db.close();
+      let db;
+      try {
+        db=await mediaDB();
+        if(!mediaCurrent(selection,file))return false;
+        await new Promise((resolve,reject)=>{const tx=db.transaction('media','readwrite');tx.objectStore('media').put(file,'current');tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error||Error('媒体保存中断'));});
+      }finally{db?.close();}
     }
-    if(disposed||!surface||config.effect!=='media'||!config.enabled)return;
+    if(!mediaCurrent(selection,file)||!surface||config.effect!=='media'||!config.enabled)return false;
+    if(media&&displayedMediaFile===file)return true;
     releaseRenderer();
-    mediaURL=URL.createObjectURL(file); media=document.createElement(file.type.startsWith('video/')?'video':'img');
+    mediaURL=URL.createObjectURL(file);media=document.createElement(file.type.startsWith('video/')?'video':'img');displayedMediaFile=file;
     media.style.cssText='width:100%;height:100%;object-fit:cover;pointer-events:none';
     media.src=mediaURL;
-    if(media.tagName==='VIDEO') { media.muted=true;media.loop=true;media.playsInline=true; }
+    if(media.tagName==='VIDEO'){media.muted=true;media.loop=true;media.playsInline=true;}
     layer.append(media);
     const current=media;
-    current.addEventListener('error',()=>status('该媒体无法解码，请换一个文件'),{signal:abort.signal});
-    refreshMotion();
-    status('本地媒体：'+file.name);
+    current.addEventListener('error',()=>{if(mediaCurrent(selection,file)&&media===current)status('该媒体无法解码，请换一个文件');},{signal:abort.signal});
+    renderFailed=false;applyPresentation();
+    if(disposed||media!==current)return false;
+    refreshMotion();status('本地媒体：'+file.name);return true;
+  }
+  async function restoreMedia(revision,selection) {
+    let db;
+    try {
+      db=await mediaDB();
+      const value=await new Promise((resolve,reject)=>{const q=db.transaction('media').objectStore('media').get('current');q.onsuccess=()=>resolve(q.result);q.onerror=()=>reject(q.error);});
+      if(revision!==mountRevision||!mediaCurrent(selection))return;
+      if(value)await setMedia(value,false,selection);else status('选择一张图片或一段本地视频');
+    }catch(error){if(revision===mountRevision&&mediaCurrent(selection))status(error?.message||String(error));}
+    finally{db?.close();}
+  }
+  function selectMedia(file) {
+    if(disposed)return;
+    const selection=++mediaSelectionRevision;
+    config.effect='media';config.enabled=true;config.paused=false;applyPresentation();
+    void setMedia(file,true,selection).then(()=>{if(mediaCurrent(selection,file))persist();}).catch(error=>{if(mediaCurrent(selection))status(error?.message||String(error));});
   }
   function mediaDB() {
-    return new Promise((resolve,reject)=>{const req=indexedDB.open('code-codex-mac-background-media',1);req.onupgradeneeded=()=>req.result.createObjectStore('media');req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error);req.onblocked=()=>reject(Error('媒体库被其他窗口占用'));});
+    return new Promise((resolve,reject)=>{const req=indexedDB.open('code-codex-mac-background-media',1);let rejected=false;req.onupgradeneeded=()=>req.result.createObjectStore('media');req.onsuccess=()=>{if(rejected)req.result.close();else resolve(req.result);};req.onerror=()=>{rejected=true;reject(req.error);};req.onblocked=()=>{rejected=true;reject(Error('媒体库被其他窗口占用'));};});
   }
   function refreshMotion() {
+    if(disposed)return;
     const paused=!surface||config.paused||settings().paused||document.hidden||reduced.matches||!config.enabled||renderFailed;
     applyRenderPolicy();frameRuntime?.setPaused(paused);
     if(!renderer&&!media)return;
-    if(renderer) {
+    if(renderer&&!rendererUpdating) {
       const next={...settings(),paused};
       if(config.effect==='glow-horizon'&&next.variant==='top')next.variant='bottom';
-      renderer.setSettings?.(next); renderer.updateSettings?.(next);
+      rendererUpdating=true;
+      try{if(!invokeRenderer(current=>{current.setSettings?.(next);if(renderer===current)current.updateSettings?.(next);}))return;}
+      finally{rendererUpdating=false;}
     }
     if(media?.tagName==='VIDEO') {
-      if(paused)media.pause();else void media.play().catch(()=>status('视频待播放；点击“继续动画”'));
+      const current=media,selection=mediaSelectionRevision,playRevision=++mediaPlayRevision;
+      if(paused)current.pause();else {
+        try{void Promise.resolve(current.play()).catch(()=>{if(mediaCurrent(selection)&&media===current&&playRevision===mediaPlayRevision)status('视频待播放；点击“继续动画”');});}
+        catch{if(mediaCurrent(selection)&&media===current&&playRevision===mediaPlayRevision)status('视频待播放；点击“继续动画”');}
+      }
     }
     if(!renderFailed)status(paused?(config.paused||settings().paused?'已暂停':document.hidden?'页面隐藏，动画暂停':'系统减少动态效果，动画暂停'):config.effect==='glow-horizon'?'交互背景 · 滚动触发动画':'动画播放中 · '+(catalog.effects.find(e=>e.id===config.effect)?.name||'本地媒体'));
   }
   function mount() {
+    if(disposed)return;
     const revision=++mountRevision;
-    releaseRenderer();frameRuntime?.invalidate();renderFailed=false;applyPresentation();
-    applyRenderPolicy();
+    releaseRenderer();frameRuntime?.invalidate();renderFailed=false;applyPresentation();applyRenderPolicy();
     if(!surface){status('当前页面尚未匹配主内容容器，背景已停止');return;}
     if(!config.enabled){status('背景已关闭');return;}
     if(config.effect==='media') {
-      if(mediaFile)void setMedia(mediaFile,false).catch(e=>status(e.message));
-      else void (async()=>{const db=await mediaDB();const value=await new Promise((r,j)=>{const q=db.transaction('media').objectStore('media').get('current');q.onsuccess=()=>r(q.result);q.onerror=()=>j(q.error);});db.close();if(revision!==mountRevision||disposed)return;if(value)await setMedia(value,false);else status('选择一张图片或一段本地视频');})().catch(e=>status(e.message));
+      const selection=mediaSelectionRevision;
+      if(mediaFile)void setMedia(mediaFile,false,selection).catch(error=>{if(revision===mountRevision&&mediaCurrent(selection))status(error?.message||String(error));});
+      else void restoreMedia(revision,selection);
       return;
     }
-    const effect=catalog.effects.find(e=>e.id===config.effect);
-    config.settings[effect.id]=normalized(effect,settings());
-    const module=window.__CC_MAC_LOAD_BACKGROUND__(effect.id);
-    if(!module?.exports?.[effect.ctor]){status('背景组件未加载：'+effect.name);return;}
+    const owner={revision};owner.frameErrorHandler=error=>rendererFailure(error,owner);rendererMount=owner;
+    if(frameRuntime)frameRuntime.onError=owner.frameErrorHandler;
     try {
+      const effect=catalog.effects.find(e=>e.id===config.effect);
+      if(!effect)throw Error('背景组件不存在');
+      config.settings[effect.id]=normalized(effect,settings());
+      const module=window.__CC_MAC_LOAD_BACKGROUND__(effect.id);
+      if(!module?.exports?.[effect.ctor])throw Error('背景组件未加载：'+effect.name);
       const values={...settings(),paused:config.paused||settings().paused||document.hidden||reduced.matches};
       const Ctor=module.exports[effect.ctor];
-      const onError=message=>{renderFailed=!!message;applyPresentation();refreshMotion();status(message||'动画播放中 · '+effect.name);};
+      const onError=message=>{if(disposed||rendererMount!==owner||revision!==mountRevision)return;renderFailed=!!message;applyPresentation();refreshMotion();if(!disposed&&rendererMount===owner&&revision===mountRevision)status(message||'动画播放中 · '+effect.name);};
+      let created;
       if(effect.id==='glow-horizon') {
         const actual={...values,variant:values.variant==='top'?'bottom':values.variant};
-        module.exports.populateGlowHorizonLayer(layer,actual);renderer=new Ctor(layer,actual);
-      } else if(effect.id==='blinking-squares'){renderer=new Ctor(layer,values,onError);canvas=layer.querySelector('canvas');}
-      else {canvas=document.createElement('canvas');layer.append(canvas);renderer=new Ctor(layer,canvas,values,onError);}
+        module.exports.populateGlowHorizonLayer(layer,actual);created=new Ctor(layer,actual);
+      }else if(effect.id==='blinking-squares'){created=new Ctor(layer,values,onError);canvas=layer.querySelector('canvas');}
+      else{canvas=document.createElement('canvas');layer.append(canvas);created=new Ctor(layer,canvas,values,onError);}
+      if(disposed||rendererMount!==owner||revision!==mountRevision){try{created?.dispose();}catch{}return;}
+      renderer=created;
       background.dataset.effect=effect.id;
       background.dataset.rendererMounts=String(Number(background.dataset.rendererMounts||0)+1);
       background.dataset.loadedModules=String(registrations?.size||0);
-      status('正在运行：'+effect.name+(reduced.matches?' · 系统已开启减少动态效果':''));
-      refreshMotion();
-    } catch(e) {releaseRenderer();renderFailed=true;applyPresentation();status('渲染失败：'+e.message);}
+      status('正在运行：'+effect.name+(reduced.matches?' · 系统已开启减少动态效果':''));refreshMotion();
+    }catch(error){rendererFailure(error,owner);}
   }
   ui=window.__CC_MAC_APPEARANCE_UI__(shadow,upstream,{
     read:()=>({...config,fixedTransparentRegions,failed:renderFailed,notice:background.dataset.status}),
@@ -357,7 +418,7 @@
     },
     reset:id=>{delete config.settings[id];if(config.effect===id){config.paused=false;mount();}persist();},
     preset:(id,values)=>{config.settings[id]=structuredClone(values);if(config.effect===id){applyPresentation();frameRuntime?.invalidate();refreshMotion();}persist();},
-    replay:id=>{if(!id||id===config.effect){frameRuntime?.invalidate();if(renderer?.replay)renderer.replay();else mount();}},
+    replay:id=>{if(!id||id===config.effect)replayRenderer();},
     opacityEnabled:()=>{if(!config.enabled){status('请先启用一个背景');return;}config.opacityEnabled=!config.opacityEnabled;applyPresentation();persist();},
     opacity:(region,value)=>{config.opacity[region]=Math.max(0,Math.min(100,value));if(region==='composer')config.composerTransparency=100-config.opacity[region];applyPresentation();persist();},
     general:(key,value)=>{
@@ -365,13 +426,13 @@
       if(key==='transparency'){config.opacityEnabled=true;for(const region of upstream.regions)if(region.key!=='composer')config.opacity[region.key]=100-value;}
       if(key==='performance'){applyRenderPolicy();mount();}else {applyPresentation();if(key==='paused')refreshMotion();}persist();
     },
-    media:file=>{config.effect='media';config.enabled=true;config.paused=false;applyPresentation();void setMedia(file).then(persist).catch(error=>status(error.message));},
+    media:selectMedia,
     diagnostics,
     restore:()=>{config.enabled=false;config.removed=true;persist();dispose();}
   },abort.signal);
   function diagnostics() {
     const rect=surface?.getBoundingClientRect();
-    const report={version:'1.0.0-rc.14',upstream:catalog.commit,effect:config.effect,enabled:config.enabled,paused:config.paused||settings().paused,visibility:document.visibilityState,reduceMotion:reduced.matches,frameCallbacks:frameRuntime?.frameCount,performance:policy,resolvedTone,foreground:'fixed-white-outline',backgroundReadback:false,frameStats:frameRuntime?.stats,popupRendering:'css',regions:JSON.parse(background.dataset.regions||'{}'),scope:surface?{tag:surface.tagName,id:surface.id,width:rect.width,height:rect.height}:null,canvas:canvas?{width:canvas.width,height:canvas.height,cssWidth:canvas.clientWidth,cssHeight:canvas.clientHeight,dpr:devicePixelRatio}:null,blur:config.blur,transparency:config.transparency,opacity:config.opacity,backgroundOpacity:config.backgroundOpacity,composerTransparency:config.composerTransparency,codeStyle:config.codeStyle,codeTransparency:config.codeTransparency};
+    const report={version:'1.0.0-rc.15',upstream:catalog.commit,effect:config.effect,enabled:config.enabled,paused:config.paused||settings().paused,visibility:document.visibilityState,reduceMotion:reduced.matches,frameCallbacks:frameRuntime?.frameCount,performance:policy,resolvedTone,foreground:'fixed-white-outline',backgroundReadback:false,frameStats:frameRuntime?.stats,popupRendering:'css',regions:JSON.parse(background.dataset.regions||'{}'),scope:surface?{tag:surface.tagName,id:surface.id,width:rect.width,height:rect.height}:null,canvas:canvas?{width:canvas.width,height:canvas.height,cssWidth:canvas.clientWidth,cssHeight:canvas.clientHeight,dpr:devicePixelRatio}:null,blur:config.blur,transparency:config.transparency,opacity:config.opacity,backgroundOpacity:config.backgroundOpacity,composerTransparency:config.composerTransparency,codeStyle:config.codeStyle,codeTransparency:config.codeTransparency};
     if(!navigator.clipboard?.writeText){status('当前应用未提供剪贴板接口');return;}
     void navigator.clipboard.writeText(JSON.stringify(report,null,2)).then(()=>status('诊断已复制（不含聊天内容）')).catch(()=>status('复制失败，请检查剪贴板权限'));
   }
@@ -533,8 +594,19 @@
   window.addEventListener('resize',()=>{geometryDirty=true;surfaceDirty=true;overlaysDirty=true;scheduleReconcile();},{signal:abort.signal});
   window.addEventListener('scroll',()=>{if(surface){geometryDirty=true;overlaysDirty=true;scheduleReconcile();}},{capture:true,passive:true,signal:abort.signal});
   for(const target of [document,shadow])target.addEventListener('animationend',event=>{if(event.target instanceof Element&&event.target.matches(overlaySelector)){overlaysDirty=true;scheduleReconcile();}},{capture:true,signal:abort.signal});
-  function dispose() {if(disposed)return;disposed=true;ui?.close();abort.abort();themeObserver.disconnect();layoutObserver.disconnect();cancelAnimationFrame(reconcileFrame);clearTimeout(reconcileTimer);detachSurface();for(const node of [...themeLeases.keys()])restoreThemeVars(node);frameRuntime?.dispose();style.remove();window.__CCMacPrepaint__?.dispose();delete window[API];}
+  function dispose() {
+    if(disposed)return;disposed=true;
+    // Each resource has its own boundary so an errant vendor/UI cleanup cannot
+    // retain the decorative RAF queue, observers, media or prepaint ownership.
+    const clean=callback=>{try{callback();}catch{}};
+    clean(()=>ui?.close());clean(()=>abort.abort());clean(()=>themeObserver.disconnect());clean(()=>layoutObserver.disconnect());
+    clean(()=>cancelAnimationFrame(reconcileFrame));clean(()=>clearTimeout(reconcileTimer));clean(()=>detachSurface());
+    clean(()=>releaseRenderer());clean(()=>resizeObserver.disconnect());clean(()=>background.remove());clean(()=>controls.remove());
+    for(const node of [...themeLeases.keys()])clean(()=>restoreThemeVars(node));
+    clean(()=>frameRuntime?.dispose());clean(()=>style.remove());clean(()=>window.__CCMacPrepaint__?.dispose());
+    if(window[API]?.dispose===dispose)delete window[API];
+  }
   function revokeSurface(root){if(disposed||surface!==root)return;detachSurface();surfaceDirty=regionsDirty=geometryDirty=overlaysDirty=true;scheduleReconcile();}
-  window[API]=Object.freeze({version:'1.0.0-rc.14',dispose,revokeSurface});
+  window[API]=Object.freeze({version:'1.0.0-rc.15',dispose,revokeSurface});
   reconcile();persist();
 })();

@@ -1,6 +1,6 @@
 # 验证与发布
 
-版本：1.0.0-rc.14。适配目标：Apple Silicon、macOS 13+、ChatGPT Desktop 的 Codex 模式。当前本机官方应用版本为 26.1007.30912；其他版本与 Chat/Work 模式未验证。
+版本：1.0.0-rc.15。适配目标：Apple Silicon、macOS 13+、ChatGPT Desktop 的 Codex 模式。当前本机官方应用版本为 26.1007.30912；其他版本与 Chat/Work 模式未验证。
 
 ## 本地已经检查
 
@@ -12,6 +12,20 @@
 - 原生应用不包含 Node/Electron 运行时或官方应用副本。
 - 已在本机安装个人八效果包并核验签名和资源哈希；原生安装与可选说明插件注册分离。卸载可清理已注册的说明插件。
 - 外部工具调用设定超时，原生安装在后台执行，避免第三方 CLI 阻塞界面。
+
+## rc.15 稳定性扫描与异常隔离
+
+本次是用户授权的主动加固，不能把静态发现的风险宣称为已经发生的原生闪退。两个已确认的旧崩溃仍是 rc.14 之前的麦克风 TCC 终止；尚无更新后的独立补全列表崩溃证据。
+
+本机官方应用已有十项用途说明，rc.14 启动器只覆盖麦克风。同类媒体功能缺少必要声明会导致系统终止，其他资源可能被拒绝，具体行为取决于系统和 API。用途覆盖只用于新图形会话的预检，卸载插件的 CLI 仍做原版签名核验，不因官方新增用途键阻塞卸载。rc.15 在 resources/privacy-descriptions.json 维护与当前官方声明对应的用途文案，构建时转成管理器 Info.plist，原生自检比对实际 Bundle 与策略。verifiedGPT 完成签名核验后检查声明覆盖，遇到新声明先提示更新启动器，不启动未覆盖会话。没有新增 entitlement、自动授权、TCC 重置或资源访问。依据见 [Apple 媒体授权文档](https://developer.apple.com/documentation/bundleresources/requesting-authorization-for-media-capture-on-macos)。
+
+帧运行时旧代码在任意 callback 抛错后跳过后续回调和重新调度，已用纯 Node 复现。新实现隔离每个 callback／onFrame／错误处理器，按注册时的 mount 所有者分派错误。每个 lazy renderer 固定创建时的帧所有者，release 取消该所有者的待执行帧并拒绝其后续排帧，再逐项清理；即使 vendor dispose 抛错，也不会留下自续帧。controller 的 constructor、setter、replay 和清理异常统一恢复原生外观，过期回调不影响新背景；最终卸载清理不会因第一项异常而截断。
+
+原生会话增加操作互斥与进程／monitor 代次。恢复期间重开和重复恢复不能创建新 monitor；迟到的旧退出回调不能清新会话。DevToolsClient 使用单一 reader 按 id 分发，独立超时／取消只结束对应请求。模拟器故意逆序回复两个并发调用；旧 actor 对照会失败，新实现还覆盖单次取消与 close 唤醒等待。命令在后台执行且接受取消；主线程心跳测试不受短 sleep 命令阻塞。整个验证只运行隔离模型、自己的本机 mock 与短命测试子进程，没有连接当前 GPT。
+
+媒体实际函数回归复现旧 A/B 保存与性能 remount 的 [B,A,B] 回流。独立选择代次及节点身份校验使过期保存、读取、解码和播放回调不覆盖新选择，已显示媒体保存完成时不重置播放；IndexedDB 在失败／过期路径也关闭。原 60／30／15 fps 与像素预算保留，没有以降画质代替异常修复。
+
+以上不等同真实录音、摄像头、日历等权限交互或长期 GPU 压力验收；当前会话保留，公开候选仍为 ad-hoc、未公证。
 
 ## rc.14 语音触发 TCC 终止
 

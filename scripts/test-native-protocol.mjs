@@ -20,7 +20,7 @@ server.on('upgrade',(request,socket,head)=>{
   assert.equal(request.url,'/mock');sockets.add(socket);socket.on('close',()=>sockets.delete(socket));
   const accept=createHash('sha1').update(request.headers['sec-websocket-key']+'258EAFA5-E914-47DA-95CA-C5AB0DC85B11').digest('base64');
   socket.write('HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: '+accept+'\r\n\r\n');
-  let bytes=head,fragments=[];
+  let bytes=head,fragments=[],reverse=[];
   const receive=chunk=>{
     bytes=Buffer.concat([bytes,chunk]);
     while(bytes.length>=2){
@@ -40,6 +40,11 @@ server.on('upgrade',(request,socket,head)=>{
         assert.equal(message.params.large.length,4096);
         socket.write(frame({id:message.id,result:{text:message.params.text}}));
       }else if(message.method==='Test.error')socket.write(frame({id:message.id,error:{code:-32000,message:'mock rejection'}}));
+      else if(message.method==='Test.reverse'){
+        reverse.push(message);
+        if(reverse.length===2)for(const reply of [...reverse].reverse())socket.write(frame({id:reply.id,result:{text:reply.params.text}}));
+      }else if(message.method==='Test.survivor')setTimeout(()=>{if(!socket.destroyed)socket.write(frame({id:message.id,result:{text:'survived'}}));},150);
+      else if(['Test.concurrentHang','Test.closePending'].includes(message.method)){} // Lifecycle tests intentionally leave these pending.
       else assert(['Test.hang','Test.timeout'].includes(message.method));
     }
   };
@@ -52,5 +57,8 @@ try{
   const timer=setTimeout(()=>child.kill('SIGTERM'),25000);let output='';
   child.stdout.on('data',data=>output+=data);child.stderr.on('data',data=>output+=data);
   const exit=await new Promise(resolve=>child.once('exit',(code,signal)=>resolve({code,signal})));clearTimeout(timer);
-  assert.equal(exit.code,0,output);assert.deepEqual(methods,['Test.echo','Test.error','Test.hang','Test.timeout']);process.stdout.write(output);
+  assert.equal(exit.code,0,output+'\nMock methods: '+methods.join(', '));
+  assert.deepEqual(methods.slice(0,4),['Test.echo','Test.error','Test.hang','Test.timeout']);
+  assert.deepEqual(methods.slice(4).sort(),['Test.reverse','Test.reverse','Test.concurrentHang','Test.survivor','Test.closePending'].sort());
+  process.stdout.write(output);
 }finally{for(const socket of sockets)socket.destroy();await new Promise(resolve=>server.close(resolve));}

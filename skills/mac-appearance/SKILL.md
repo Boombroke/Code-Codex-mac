@@ -23,4 +23,6 @@ rc.13 also handles the native Home composer body Portal and peer file rail. Its 
 
 rc.14 supplies the launcher microphone usage description required by macOS when microphone access from its GPT child is attributed to this responsible app. Missing descriptions in earlier packages caused confirmed TCC aborts. Updates do not request, grant or reset microphone permission; the user decides when activating voice. Do not trigger recording or a privacy prompt to test the current GPT session.
 
+rc.15 validates the host privacy-purpose contract before starting it; unsupported new host declarations require an updated launcher. Existing resource descriptions are metadata only and never grant access. Renderer exceptions stop only the owned decoration and restore native appearance; restore/reconnect operations are serialized, and canceled or stale sessions cannot attach later. The menu status distinguishes ordinary exit, nonzero exit and signals without collecting chat logs.
+
 This is a release candidate until actual activation is confirmed. Build, self-test and an independent renderer preview do not prove host compatibility. Keep signing and notarization status explicit when discussing public release.

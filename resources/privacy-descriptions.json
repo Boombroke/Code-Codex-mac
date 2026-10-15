@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "descriptions": {
+    "NSMicrophoneUsageDescription": "用于你在官方 ChatGPT 中主动开启的语音输入和语音对话；macOS 将此启动会话的麦克风权限关联到「GPT 动态背景」。",
+    "NSCameraUsageDescription": "用于你在官方 ChatGPT 的语音或视频功能中主动开启摄像头，以分享画面；是否允许由你决定。",
+    "NSAudioCaptureUsageDescription": "用于你在官方 ChatGPT 中主动启用的系统音频分享或录制功能，以提供对话所需的声音内容。",
+    "NSAppleEventsUsageDescription": "用于你要求官方 ChatGPT 通过自动化与其他 Mac 应用交互时发送 Apple Events。",
+    "NSCalendarsUsageDescription": "用于你授权官方 ChatGPT 读取或编辑日历事件，以完成你请求的日程任务。",
+    "NSCalendarsFullAccessUsageDescription": "用于你授权官方 ChatGPT 读取、创建或编辑日历事件，以完成你请求的日程任务。",
+    "NSRemindersUsageDescription": "用于你授权官方 ChatGPT 读取或编辑提醒事项，以完成你请求的提醒任务。",
+    "NSRemindersFullAccessUsageDescription": "用于你授权官方 ChatGPT 读取、创建或编辑提醒事项，以完成你请求的提醒任务。",
+    "NSLocationUsageDescription": "用于你在官方 ChatGPT 中请求与当前位置有关的信息或任务时提供位置；是否允许由你决定。",
+    "NSDesktopFolderUsageDescription": "用于你要求官方 ChatGPT 读取或编辑桌面文件时访问相关内容。"
+  }
+}

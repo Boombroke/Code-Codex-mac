@@ -16,7 +16,7 @@ struct ManagerError: LocalizedError {
     var errorDescription: String? { message }
 }
 
-func command(_ executable: String, _ arguments: [String], timeout: TimeInterval = 20) throws -> String {
+func command(_ executable: String, _ arguments: [String], timeout: TimeInterval = 20, isCancelled: () -> Bool = { false }) throws -> String {
     let fm = FileManager.default, task = Process(), done = DispatchSemaphore(value: 0)
     let temporary = fm.temporaryDirectory.appendingPathComponent("code-codex-command-\(UUID().uuidString)")
     try fm.createDirectory(at: temporary, withIntermediateDirectories: false, attributes: [.posixPermissions: 0o700])
@@ -31,21 +31,39 @@ func command(_ executable: String, _ arguments: [String], timeout: TimeInterval 
     task.environment = ProcessInfo.processInfo.environment.filter { allowed.contains($0.key) }
     task.arguments = arguments; task.standardInput = FileHandle.nullDevice; task.standardOutput = output; task.standardError = errors
     task.terminationHandler = { _ in done.signal() }; try task.run()
-    if done.wait(timeout: .now() + timeout) == .timedOut {
-        task.terminate()
-        if done.wait(timeout: .now() + 2) == .timedOut { Darwin.kill(task.processIdentifier, SIGKILL); _ = done.wait(timeout: .now() + 2) }
-        throw ManagerError(message: "\(URL(fileURLWithPath: executable).lastPathComponent) 操作超时，可稍后重试")
+    let deadline = DispatchTime.now() + timeout
+    while done.wait(timeout: .now() + 0.05) == .timedOut {
+        let cancelled = isCancelled()
+        if cancelled || DispatchTime.now().uptimeNanoseconds >= deadline.uptimeNanoseconds {
+            if task.isRunning { task.terminate() }
+            if done.wait(timeout: .now() + 2) == .timedOut {
+                if task.isRunning { Darwin.kill(task.processIdentifier, SIGKILL) }
+                _ = done.wait(timeout: .now() + 2)
+            }
+            if cancelled { throw CancellationError() }
+            throw ManagerError(message: "\(URL(fileURLWithPath: executable).lastPathComponent) 操作超时，可稍后重试")
+        }
     }
     let data = try Data(contentsOf: out), detail = try Data(contentsOf: err)
     if task.terminationStatus != 0 { let message = String(decoding: detail.suffix(16_384), as: UTF8.self); throw ManagerError(message: message.isEmpty ? "操作失败（退出码 \(task.terminationStatus)）" : message) }
     return String(decoding: data, as: UTF8.self)
 }
 
-func verifiedGPT(_ appURL: URL) throws -> URL {
+func commandAsync(_ executable: String, _ arguments: [String], timeout: TimeInterval = 20) async throws -> String {
+    try Task.checkCancellation()
+    let worker = Task.detached {
+        try Task.checkCancellation()
+        return try command(executable, arguments, timeout: timeout, isCancelled: { Task.isCancelled })
+    }
+    return try await withTaskCancellationHandler { try await worker.value } onCancel: { worker.cancel() }
+}
+
+func verifiedGPT(_ appURL: URL, isCancelled: () -> Bool = { false }, requirePrivacyCoverage: Bool = true) throws -> URL {
     let plist = try Data(contentsOf: appURL.appendingPathComponent("Contents/Info.plist"))
     guard let info = try PropertyListSerialization.propertyList(from: plist, format: nil) as? [String: Any], info["CFBundleIdentifier"] as? String == "com.openai.codex", let executable = info["CFBundleExecutable"] as? String else { throw ManagerError(message: "请选择官方 ChatGPT Desktop / Codex 应用") }
-    _ = try command("/usr/bin/codesign", ["--verify", "--strict", appURL.path])
-    _ = try command("/usr/bin/codesign", ["--verify", "-R", "=anchor apple generic and certificate leaf[subject.OU] = \"2DC432GLL2\" and identifier \"com.openai.codex\"", appURL.path])
+    _ = try command("/usr/bin/codesign", ["--verify", "--strict", appURL.path], isCancelled: isCancelled)
+    _ = try command("/usr/bin/codesign", ["--verify", "-R", "=anchor apple generic and certificate leaf[subject.OU] = \"2DC432GLL2\" and identifier \"com.openai.codex\"", appURL.path], isCancelled: isCancelled)
+    if requirePrivacyCoverage { try validateHostedPrivacyDescriptions(hostInfo: info, launcherInfo: Bundle.main.infoDictionary ?? [:]) }
     return appURL.appendingPathComponent("Contents/MacOS/\(executable)")
 }
 
@@ -147,38 +165,105 @@ actor DevToolsClient {
     private let socket: URLSessionWebSocketTask
     private let timeoutNanoseconds: UInt64
     private var sequence = 0
+    private var closed = false
+    private var reader: Task<Void, Never>?
+    private var pending: [Int: CheckedContinuation<[String: Any], Error>] = [:]
+    private var deadlines: [Int: Task<Void, Never>] = [:]
+    private var sends: [Int: Task<Void, Never>] = [:]
     init(url: URL, timeoutNanoseconds: UInt64 = 15_000_000_000) { self.timeoutNanoseconds = timeoutNanoseconds; socket = localSession.webSocketTask(with: url); socket.resume() }
     func call(_ method: String, _ params: [String: Any] = [:]) async throws -> [String: Any] {
         try Task.checkCancellation()
+        guard !closed else { throw ManagerError(message: "应用接入连接已关闭") }
         sequence += 1; let id = sequence
         let data = try JSONSerialization.data(withJSONObject: ["id": id, "method": method, "params": params])
-        let socket = self.socket, timeout = timeoutNanoseconds
+        let message = URLSessionWebSocketTask.Message.string(String(decoding: data, as: UTF8.self))
         return try await withTaskCancellationHandler {
-          try await socket.send(.string(String(decoding: data, as: UTF8.self)))
-          return try await withThrowingTaskGroup(of: [String: Any].self) { group in
-            group.addTask { [socket] in
-                while true {
+            try await withCheckedThrowingContinuation { continuation in
+                guard !Task.isCancelled else { continuation.resume(throwing: CancellationError()); return }
+                guard !closed else { continuation.resume(throwing: ManagerError(message: "应用接入连接已关闭")); return }
+                pending[id] = continuation
+                startReader()
+                deadlines[id] = Task { [weak self, timeoutNanoseconds] in
+                    do { try await Task.sleep(nanoseconds: timeoutNanoseconds) }
+                    catch { return }
+                    await self?.finish(id, .failure(ManagerError(message: "应用接入超时")))
+                }
+                sends[id] = Task { [weak self, socket] in
+                    do { try await socket.send(message) }
+                    catch { if !Task.isCancelled { await self?.failAll(error) } }
+                }
+            }
+        } onCancel: {
+            Task { await self.finish(id, .failure(CancellationError())) }
+        }
+    }
+    private func startReader() {
+        guard reader == nil else { return }
+        reader = Task { [weak self, socket] in
+            do {
+                while !Task.isCancelled {
                     let message = try await socket.receive()
                     let bytes: Data
                     switch message { case .string(let text): bytes = Data(text.utf8); case .data(let value): bytes = value; @unknown default: continue }
-                    guard let object = try JSONSerialization.jsonObject(with: bytes) as? [String: Any], object["id"] as? Int == id else { continue }
-                    if let error = object["error"] as? [String: Any] { throw ManagerError(message: error["message"] as? String ?? "接入失败") }
-                    return object["result"] as? [String: Any] ?? [:]
+                    let object = try JSONSerialization.jsonObject(with: bytes) as? [String: Any]
+                    guard let object, let id = object["id"] as? Int else { continue }
+                    if let error = object["error"] as? [String: Any] {
+                        await self?.finish(id, .failure(ManagerError(message: error["message"] as? String ?? "接入失败")))
+                    } else { await self?.finish(id, .success(object["result"] as? [String: Any] ?? [:])) }
                 }
-            }
-            group.addTask { [socket] in
-                try await Task.sleep(nanoseconds: timeout)
-                socket.cancel(with: .goingAway, reason: nil)
-                throw ManagerError(message: "应用接入超时")
-            }
-            guard let result = try await group.next() else { throw ManagerError(message: "应用接入失败") }
-            group.cancelAll(); return result
-          }
-        } onCancel: {
-            socket.cancel(with: .goingAway, reason: nil)
+            } catch { await self?.failAll(error) }
         }
     }
-    func close() { socket.cancel(with: .goingAway, reason: nil) }
+    private func finish(_ id: Int, _ result: Result<[String: Any], Error>) {
+        guard let continuation = pending.removeValue(forKey: id) else { return }
+        deadlines.removeValue(forKey: id)?.cancel(); sends.removeValue(forKey: id)?.cancel()
+        continuation.resume(with: result)
+    }
+    private func failAll(_ error: Error) {
+        guard !closed else { return }
+        closed = true; reader?.cancel(); reader = nil
+        socket.cancel(with: .goingAway, reason: nil)
+        for id in Array(pending.keys) { finish(id, .failure(error)) }
+    }
+    func close() { failAll(ManagerError(message: "应用接入连接已关闭")) }
+}
+
+// These checks talk exclusively to the deliberately limited /mock peer.
+func devToolsConcurrencySelfTest(url: URL) async throws {
+    let client = DevToolsClient(url: url, timeoutNanoseconds: 2_000_000_000)
+    do {
+        async let first = client.call("Test.reverse", ["text": "first"])
+        async let second = client.call("Test.reverse", ["text": "second"])
+        let (left, right) = try await (first, second)
+        guard left["text"] as? String == "first", right["text"] as? String == "second" else { throw ManagerError(message: "Concurrent replies were delivered to the wrong request") }
+        let hanging = Task { try await client.call("Test.concurrentHang") }
+        let survivor = Task { try await client.call("Test.survivor") }
+        try await Task.sleep(nanoseconds: 50_000_000); hanging.cancel()
+        do { _ = try await hanging.value; throw ManagerError(message: "Cancelled request unexpectedly succeeded") }
+        catch is CancellationError { }
+        guard try await survivor.value["text"] as? String == "survived" else { throw ManagerError(message: "Cancelling one request closed another request's connection") }
+        let closing = Task { try await client.call("Test.closePending") }
+        try await Task.sleep(nanoseconds: 50_000_000); await client.close()
+        var closeReturned = false
+        do { _ = try await closing.value } catch { closeReturned = true }
+        guard closeReturned else { throw ManagerError(message: "Closing a connection left its pending request unresolved") }
+        do { _ = try await client.call("Test.mustNotSend"); throw ManagerError(message: "Closed connection accepted a request") }
+        catch let error as ManagerError { guard error.message == "应用接入连接已关闭" else { throw error } }
+    } catch { await client.close(); throw error }
+}
+
+@MainActor func nativeCommandAsyncSelfTest() async throws {
+    var mainActorResponded = false
+    let pulse = Task { @MainActor in try await Task.sleep(nanoseconds: 25_000_000); mainActorResponded = true }
+    _ = try await commandAsync("/bin/sleep", ["0.15"])
+    guard mainActorResponded else { pulse.cancel(); throw ManagerError(message: "A CLI wait blocked the main actor") }
+    _ = try await pulse.value
+    let command = Task { try await commandAsync("/bin/sleep", ["2"]) }
+    try await Task.sleep(nanoseconds: 50_000_000)
+    let cancelledAt = Date(); command.cancel()
+    do { _ = try await command.value; throw ManagerError(message: "Cancelled CLI command unexpectedly succeeded") }
+    catch is CancellationError { }
+    guard Date().timeIntervalSince(cancelledAt) < 1.5 else { throw ManagerError(message: "CLI cancellation did not finish promptly") }
 }
 
 @MainActor final class Manager: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMenuDelegate {
@@ -196,6 +281,9 @@ actor DevToolsClient {
     private var activeCode: String?
     private var activeLaunchScript: String?
     private var session: Task<Void, Never>?
+    private var launchTask: Task<Void, Never>?
+    private var lifecycle = SessionLifecycle()
+    private var restoration: Task<Void, Never>?
     private var clients: [String: DevToolsClient] = [:]
     private var scriptIDs: [String: String] = [:]
     private var restoreIncomplete = false
@@ -266,11 +354,12 @@ actor DevToolsClient {
     private func error(_ problem: Error) { status.stringValue = problem.localizedDescription; NSApp.activate(ignoringOtherApps: true); let alert = NSAlert(); alert.messageText = "操作未完成"; alert.informativeText = problem.localizedDescription; alert.runModal() }
 
     @objc private func chooseGPT() {
+        guard !installing, !launching, !lifecycle.isBusy else { return }
         let picker = NSOpenPanel(); picker.canChooseDirectories = false; picker.allowedContentTypes = [.applicationBundle]; picker.treatsFilePackagesAsDirectories = false; picker.allowsMultipleSelection = false
-        if picker.runModal() == .OK, let url = picker.url { UserDefaults.standard.set(url.path, forKey: "gptPath"); refreshStatus() }
+        if picker.runModal() == .OK, !installing, !launching, !lifecycle.isBusy, let url = picker.url { UserDefaults.standard.set(url.path, forKey: "gptPath"); refreshStatus() }
     }
     @objc private func installManager() {
-        guard !installing else { return }; installing = true; status.stringValue = "正在安装并登记 Dock 入口…"
+        guard !installing, !launching, !lifecycle.isBusy else { return }; installing = true; status.stringValue = "正在安装并登记 Dock 入口…"
         let source = Bundle.main.bundleURL
         Task {
             let result = await Task.detached { Result { try performInstallation(from: source) } }.value
@@ -286,25 +375,30 @@ actor DevToolsClient {
         }
     }
     @objc private func uninstallManager() {
+        guard !installing, !launching, !lifecycle.isBusy else { return }
         let alert = NSAlert(); alert.messageText = "卸载 GPT 动态背景？"; alert.informativeText = "会恢复已接入的窗口外观、移除本启动器的 Dock 入口，并将启动器移入废纸篓。官方 GPT、其他 Dock 图标、聊天与背景参数保留。"; alert.addButton(withTitle: "卸载"); alert.addButton(withTitle: "取消")
-        guard alert.runModal() == .alertFirstButtonReturn else { return }
-        Task { await restore(); do {
+        guard alert.runModal() == .alertFirstButtonReturn, !installing, !launching,
+              let operation = lifecycle.begin(.uninstalling) else { return }
+        restoreIncomplete = false
+        Task { defer { _ = lifecycle.finish(operation) }; await performRestore(); do {
+            guard !restoreIncomplete else { throw ManagerError(message: "部分窗口尚未恢复，已保留启动器。请使用 GPT 窗口内的恢复按钮，或正常退出 GPT 后再卸载。") }
             if UserDefaults.standard.bool(forKey: "companionRegistered") || UserDefaults.standard.bool(forKey: "marketplaceRegistered") {
                 guard FileManager.default.isExecutableFile(atPath: codexCLI.path) else { throw ManagerError(message: "配套说明插件仍已注册，请先恢复官方 GPT 或在插件目录卸载它，再移除管理器。") }
-                _ = try verifyGPT()
+                _ = try await verifyGPT(requirePrivacyCoverage: false)
                 if UserDefaults.standard.bool(forKey: "companionRegistered") {
-                    _ = try command(codexCLI.path, ["plugin", "remove", "code-codex-mac-manager@code-codex-mac-native", "--json"])
+                    _ = try await commandAsync(codexCLI.path, ["plugin", "remove", "code-codex-mac-manager@code-codex-mac-native", "--json"])
                     UserDefaults.standard.set(false, forKey: "companionRegistered")
                 }
                 if UserDefaults.standard.bool(forKey: "marketplaceRegistered") {
-                    do { _ = try command(codexCLI.path, ["plugin", "marketplace", "remove", "code-codex-mac-native", "--json"]) }
+                    do { _ = try await commandAsync(codexCLI.path, ["plugin", "marketplace", "remove", "code-codex-mac-native", "--json"]) }
                     catch let error as ManagerError {
                         guard error.message.contains("marketplace `code-codex-mac-native` is not configured or installed") else { throw error }
                     }
                     UserDefaults.standard.set(false, forKey: "marketplaceRegistered")
                 }
             }
-            try DockEntry.remove(url: installedURL)
+            let destination = installedURL
+            try await Task.detached { try DockEntry.remove(url: destination) }.value
             if FileManager.default.fileExists(atPath: installedURL.path) {
                 guard let identifier = Bundle(url: installedURL)?.bundleIdentifier, identifier == managerID else { throw ManagerError(message: "安装目录属于其他应用，已停止卸载。") }
                 try FileManager.default.trashItem(at: installedURL, resultingItemURL: nil)
@@ -314,8 +408,10 @@ actor DevToolsClient {
         } catch { self.error(error) } }
     }
 
-    private func verifyGPT() throws -> URL {
-        try verifiedGPT(appURL)
+    private func verifyGPT(requirePrivacyCoverage: Bool = true) async throws -> URL {
+        let selectedApp = appURL
+        let worker = Task.detached { try verifiedGPT(selectedApp, isCancelled: { Task.isCancelled }, requirePrivacyCoverage: requirePrivacyCoverage) }
+        return try await withTaskCancellationHandler { try await worker.value } onCancel: { worker.cancel() }
     }
     private func checkedScript(_ name: String) throws -> String {
         let data = try Data(contentsOf: Bundle.main.resourceURL!.appendingPathComponent(name + ".js"))
@@ -325,6 +421,7 @@ actor DevToolsClient {
         return String(decoding: data, as: UTF8.self)
     }
     @objc private func openGPT() {
+        guard !lifecycle.isBusy, !installing else { return }
         guard sameLocation(Bundle.main.bundleURL, installedURL) else { showWindow(); status.stringValue = "请先安装，再从 Dock 的「GPT 动态背景」入口启动。"; return }
         let action = openAction(launching: launching, ownedRunning: process?.isRunning == true, connected: !clients.isEmpty, monitoring: session != nil, otherRunning: !NSRunningApplication.runningApplications(withBundleIdentifier: "com.openai.codex").isEmpty)
         switch action {
@@ -333,40 +430,51 @@ actor DevToolsClient {
             if let child = process { NSRunningApplication(processIdentifier: child.processIdentifier)?.activate(options: [.activateAllWindows]) }
             return
         case .reconnect:
-            if let child = process, let port = activePort, let code = activeCode, let script = activeLaunchScript {
+            if let child = process, let processID = lifecycle.processID, let port = activePort, let code = activeCode, let script = activeLaunchScript {
                 NSRunningApplication(processIdentifier: child.processIdentifier)?.activate(options: [.activateAllWindows])
                 applyLaunchPreferences = true; status.stringValue = "正在重新启用当前 GPT 的背景…"
-                session = Task { [weak self] in await self?.monitor(pid: child.processIdentifier, port: port, code: code, launchScript: script) }
+                let monitorID = lifecycle.beginMonitor()
+                session = Task { [weak self] in await self?.monitor(pid: child.processIdentifier, processID: processID, monitorID: monitorID, port: port, code: code, launchScript: script) }
             }; return
         case .requireQuit:
             error(ManagerError(message: "GPT 已从普通入口打开。请完成当前任务并按 Cmd+Q 完全退出，再点击 Dock 的「GPT 动态背景」。启动器会保留正在运行的聊天。")); return
         case .start: break
         }
         launching = true; openButton?.isEnabled = false; status.stringValue = "核验官方 GPT 与本地背景组件…"
-        Task {
+        launchTask = Task {
+            defer { launchTask = nil }
             do {
-                let executable = try verifyGPT(), code = try checkedScript("renderer"), launchScript = try checkedScript("launch"), port = try reservePort()
+                let executable = try await verifyGPT(), code = try checkedScript("renderer"), launchScript = try checkedScript("launch"), port = try reservePort()
+                try Task.checkCancellation()
+                guard !lifecycle.isBusy else { throw CancellationError() }
+                guard NSRunningApplication.runningApplications(withBundleIdentifier: "com.openai.codex").isEmpty else { throw ManagerError(message: "GPT 已从其他入口打开，已保留正在运行的应用。请完成任务后正常退出，再使用本入口。") }
+                let processID = UUID()
                 let child = Process(); child.executableURL = executable; child.arguments = ["--remote-debugging-address=127.0.0.1", "--remote-debugging-port=\(port)"]
                 child.standardOutput = FileHandle.nullDevice; child.standardError = FileHandle.nullDevice
-                child.terminationHandler = { [weak self] _ in
+                child.terminationHandler = { [weak self] child in
                     guard let manager = self else { return }
-                    Task { @MainActor in await manager.disconnected() }
+                    Task { @MainActor in await manager.disconnected(pid: child.processIdentifier, processID: processID, status: child.terminationStatus, signalled: child.terminationReason == .uncaughtSignal) }
                 }
-                try child.run(); process = child; activePort = port; activeCode = code; activeLaunchScript = launchScript; applyLaunchPreferences = true
+                try child.run(); _ = lifecycle.beginProcess(processID); process = child; activePort = port; activeCode = code; activeLaunchScript = launchScript; applyLaunchPreferences = true
                 status.stringValue = "GPT 已打开，正在启用背景…"; openButton?.isEnabled = true; launching = false
-                session = Task { [weak self] in await self?.monitor(pid: child.processIdentifier, port: port, code: code, launchScript: launchScript) }
-            } catch { launching = false; openButton?.isEnabled = true; self.error(error) }
+                let monitorID = lifecycle.beginMonitor()
+                session = Task { [weak self] in await self?.monitor(pid: child.processIdentifier, processID: processID, monitorID: monitorID, port: port, code: code, launchScript: launchScript) }
+            } catch { launching = false; openButton?.isEnabled = true; if !(error is CancellationError) { self.error(error) } }
         }
     }
-    private func monitor(pid: Int32, port: Int, code: String, launchScript: String) async {
+    private func monitor(pid: Int32, processID: UUID, monitorID: UUID, port: Int, code: String, launchScript: String) async {
         var misses = 0
-        while !Task.isCancelled && process?.isRunning == true {
+        func isCurrent() -> Bool { lifecycle.ownsMonitor(monitorID, process: processID) && process?.processIdentifier == pid && process?.isRunning == true }
+        func requireCurrent() throws { guard !Task.isCancelled, isCurrent() else { throw CancellationError() } }
+        while !Task.isCancelled && isCurrent() {
             do {
-                let owner = try command("/usr/sbin/lsof", ["-nP", "-a", "-p", String(pid), "-iTCP:\(port)", "-sTCP:LISTEN", "-Fn"])
+                let owner = try await commandAsync("/usr/sbin/lsof", ["-nP", "-a", "-p", String(pid), "-iTCP:\(port)", "-sTCP:LISTEN", "-Fn"])
+                try requireCurrent()
                 let addresses = owner.split(separator: "\n").filter { $0.hasPrefix("n") }
                 guard addresses == [Substring("n127.0.0.1:\(port)")] else { throw ManagerError(message: "本机接入端点未就绪") }
                 var request = URLRequest(url: URL(string: "http://127.0.0.1:\(port)/json/list")!); request.timeoutInterval = 3
                 let (data, response) = try await localSession.data(for: request)
+                try requireCurrent()
                 guard (response as? HTTPURLResponse)?.statusCode == 200, let targets = try JSONSerialization.jsonObject(with: data) as? [[String: Any]] else { throw ManagerError(message: "应用页面列表不可用") }
                 for target in targets {
                     guard let id = target["id"] as? String, let url = validTarget(target, port: port), clients[id] == nil else { continue }
@@ -375,6 +483,7 @@ actor DevToolsClient {
                     do {
                         if applyLaunchPreferences {
                             let seeded = try await client.call("Runtime.evaluate", ["expression": launchScript])
+                            try requireCurrent()
                             guard seeded["exceptionDetails"] == nil else { throw ManagerError(message: "无法恢复已保存的背景设置") }
                             guard let result = seeded["result"] as? [String: Any], result["type"] as? String == "boolean", result["value"] as? Bool == true else {
                                 await client.close(); continue
@@ -383,44 +492,70 @@ actor DevToolsClient {
                         }
                         let registration = try await client.call("Page.addScriptToEvaluateOnNewDocument", ["source": code])
                         guard let identifier = registration["identifier"] as? String else { throw ManagerError(message: "背景重载注册失败") }; scriptID = identifier
+                        try requireCurrent()
                         let result = try await client.call("Runtime.evaluate", ["expression": code, "awaitPromise": true])
                         guard result["exceptionDetails"] == nil else { throw ManagerError(message: "背景组件初始化失败") }
-                        try Task.checkCancellation()
+                        try requireCurrent()
                         clients[id] = client; scriptIDs[id] = identifier; status.stringValue = "外观组件已接入。GPT 窗口内可调节背景。\n菜单栏 ✦ 提供设置、恢复和卸载。"
                     } catch {
-                        if Task.isCancelled {
+                        if Task.isCancelled || !isCurrent() {
                             let cleanupScriptID = scriptID
                             let restored = await Task.detached {
                                 let cleanup = DevToolsClient(url: url)
-                                if let identifier = cleanupScriptID { _ = try? await cleanup.call("Page.removeScriptToEvaluateOnNewDocument", ["identifier": identifier]) }
-                                do { let response = try await cleanup.call("Runtime.evaluate", ["expression": restoreExpression]); await cleanup.close(); return response["exceptionDetails"] == nil }
+                                var removed = true
+                                if let identifier = cleanupScriptID { do { _ = try await cleanup.call("Page.removeScriptToEvaluateOnNewDocument", ["identifier": identifier]) } catch { removed = false } }
+                                do { let response = try await cleanup.call("Runtime.evaluate", ["expression": restoreExpression]); await cleanup.close(); return removed && response["exceptionDetails"] == nil }
                                 catch { await cleanup.close(); return false }
                             }.value
-                            if !restored { restoreIncomplete = true }
+                            if !restored && lifecycle.ownsProcess(processID) { restoreIncomplete = true }
                         } else if let identifier = scriptID { _ = try? await client.call("Page.removeScriptToEvaluateOnNewDocument", ["identifier": identifier]) }
                         await client.close(); throw error
                     }
                 }
                 for id in Array(clients.keys) where !targets.contains(where: { $0["id"] as? String == id }) { await clients[id]?.close(); clients.removeValue(forKey: id); scriptIDs.removeValue(forKey: id) }
                 misses = 0
-            } catch { misses += 1; if misses == 60 { status.stringValue = "未匹配当前 GPT 的接入页面。可点击启动按钮重新接入，或检查应用版本兼容性。"; session = nil; break } }
+            } catch { guard !Task.isCancelled, isCurrent() else { return }; misses += 1; if misses == 60 { status.stringValue = "未匹配当前 GPT 的接入页面。可点击启动按钮重新接入，或检查应用版本兼容性。"; session = nil; lifecycle.stopMonitor(); break } }
             try? await Task.sleep(nanoseconds: clients.isEmpty ? 1_000_000_000 : 10_000_000_000)
         }
     }
-    private func disconnected() async { session?.cancel(); session = nil; for client in clients.values { await client.close() }; clients.removeAll(); scriptIDs.removeAll(); process = nil; activePort = nil; activeCode = nil; activeLaunchScript = nil; launching = false; openButton?.isEnabled = true; status.stringValue = "GPT 已退出。下次点击 Dock 的「GPT 动态背景」即可启动。" }
+    private func disconnected(pid: Int32, processID: UUID, status: Int32, signalled: Bool) async {
+        guard process?.processIdentifier == pid, lifecycle.endProcess(processID) else { return }
+        session?.cancel(); session = nil
+        let detachedClients = Array(clients.values); clients.removeAll(); scriptIDs.removeAll()
+        process = nil; activePort = nil; activeCode = nil; activeLaunchScript = nil; launching = false; openButton?.isEnabled = true
+        self.status.stringValue = hostExitMessage(status: status, signalled: signalled)
+        for client in detachedClients { await client.close() }
+    }
     private func restore() async {
-        status.stringValue = "正在恢复窗口外观…"
+        if let pending = restoration { await pending.value; return }
+        guard !launching, !installing, let operation = lifecycle.begin(.restoring) else { return }
         restoreIncomplete = false
+        let worker = Task { await performRestore() }; restoration = worker
+        await worker.value; restoration = nil; _ = lifecycle.finish(operation)
+    }
+    private func performRestore() async {
+        status.stringValue = "正在恢复窗口外观…"
         let pending = session; session?.cancel(); session = nil; await pending?.value
-        for (id, client) in clients {
-            if let identifier = scriptIDs[id] { _ = try? await client.call("Page.removeScriptToEvaluateOnNewDocument", ["identifier": identifier]) }
+        let detachedClients = clients, detachedScripts = scriptIDs; clients.removeAll(); scriptIDs.removeAll()
+        for (id, client) in detachedClients {
+            if let identifier = detachedScripts[id] { do { _ = try await client.call("Page.removeScriptToEvaluateOnNewDocument", ["identifier": identifier]) } catch { restoreIncomplete = true } }
             do { let result = try await client.call("Runtime.evaluate", ["expression": restoreExpression]); if result["exceptionDetails"] != nil { restoreIncomplete = true } }
             catch { restoreIncomplete = true }
             await client.close()
         }
-        clients.removeAll(); scriptIDs.removeAll()
         status.stringValue = restoreIncomplete ? "部分窗口未能恢复，请使用 GPT 窗口内的恢复按钮，或正常退出并从原图标重开 GPT。" : "窗口外观已恢复。正常退出并从原图标重开 GPT，可关闭本机接入端点。"
     }
     @objc private func restoreAppearance() { Task { await restore() } }
-    @objc private func quitManager() { session?.cancel(); Task { for client in clients.values { await client.close() }; NSApp.terminate(nil) } }
+    @objc private func quitManager() {
+        guard !installing, let operation = lifecycle.begin(.quitting) else { return }
+        let pendingLaunch = launchTask; pendingLaunch?.cancel()
+        let pending = session; session?.cancel(); session = nil
+        Task {
+            await pendingLaunch?.value
+            await pending?.value
+            let detachedClients = Array(clients.values); clients.removeAll(); scriptIDs.removeAll()
+            for client in detachedClients { await client.close() }
+            _ = lifecycle.finish(operation); NSApp.terminate(nil)
+        }
+    }
 }
